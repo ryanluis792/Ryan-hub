@@ -137,15 +137,17 @@ CheckBtn.TextSize = 12
 Instance.new("UICorner", CheckBtn).CornerRadius = UDim.new(0, 6)
 
 GetKeyBtn.MouseButton1Click:Connect(function()
+    local fullLink = GET_KEY_URL .. "?hwid=" .. getHWID()
     if setclipboard then
-        setclipboard(GET_KEY_URL)
-        Status.Text = "Link copiado! Cole no seu navegador."
+        setclipboard(fullLink)
+        Status.Text = "Link com HWID copiado! Cole no navegador."
         Status.TextColor3 = Color3.fromRGB(0, 255, 170)
     else
-        KeyBox.Text = GET_KEY_URL
+        KeyBox.Text = fullLink
         Status.Text = "Copie o link da caixa acima no navegador!"
     end
 end)
+
 
 CheckBtn.MouseButton1Click:Connect(function()
     local inputKey = KeyBox.Text:gsub("%s+", "")
