@@ -36,52 +36,71 @@ local function httpGetSafe(url)
     return ok2 and body or nil
 end
 
+local lastServerMsg = "Sem resposta do servidor"
+
 local function validatePandaKey(userKey)
     local hwid = getHWID()
-    local apiUrl = string.reverse("etadilav/4vp/moc.htuadnap.ipa//:sptth")
-    local payload = HttpService:JSONEncode({
-        service = SERVICE_ID,
-        serviceId = SERVICE_ID,
-        key = userKey,
-        hwid = hwid
-    })
+    local endpoints = {
+        { url = string.reverse("etadilav/4vp/moc.htuadnap.ipa//:sptth"), method = "POST" },
+        { url = string.reverse("etadilav/syek/1v/moc.htuadnap.ipa//:sptth"), method = "POST" },
+        { url = string.reverse("etadilav/syek/1v/moc.htuadnap.ipa//:sptth"), method = "GET" },
+        { url = string.reverse("noitadilav_2v/ten.tnempolevedadnap//:sptth"), method = "GET" }
+    }
 
     local req = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
-    if req then
-        local ok, res = pcall(function()
-            return req({
-                Url = apiUrl,
-                Method = "POST",
-                Headers = { ["Content-Type"] = "application/json" },
-                Body = payload
+
+    for _, ep in ipairs(endpoints) do
+        local body = nil
+        if ep.method == "POST" and req then
+            local payload = HttpService:JSONEncode({
+                service = SERVICE_ID,
+                serviceId = SERVICE_ID,
+                identifier = SERVICE_ID,
+                key = userKey,
+                hwid = hwid
             })
-        end)
-        if ok and res and res.Body then
+            local ok, res = pcall(function()
+                return req({
+                    Url = ep.url,
+                    Method = "POST",
+                    Headers = {
+                        ["Content-Type"] = "application/json",
+                        ["Accept"] = "application/json"
+                    },
+                    Body = payload
+                })
+            end)
+            if ok and res and res.Body then
+                body = res.Body
+            end
+        elseif ep.method == "GET" then
+            local q = ep.url .. "?service=" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid
+            body = httpGetSafe(q)
+        end
+
+        if body and body ~= "" then
+            lastServerMsg = tostring(body):sub(1, 65)
             local okJson, data = pcall(function()
-                return HttpService:JSONDecode(res.Body)
+                return HttpService:JSONDecode(body)
             end)
             if okJson and type(data) == "table" then
-                if data.success == true or data.authenticated == true or data.valid == true then
+                if data.success == true
+                    or data.authenticated == true
+                    or data.valid == true
+                    or data.V2_Authentication == "success"
+                    or (type(data.data) == "table" and data.data.valid == true)
+                then
                     return true
                 end
-            end
-        end
-    end
-
-    local getUrl = apiUrl .. "?service=" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid
-    local body = httpGetSafe(getUrl)
-    if body and body ~= "" then
-        local okJson, data = pcall(function()
-            return HttpService:JSONDecode(body)
-        end)
-        if okJson and type(data) == "table" then
-            if data.success == true or data.authenticated == true or data.valid == true then
-                return true
+                if data.message or data.error then
+                    lastServerMsg = tostring(data.message or data.error):sub(1, 65)
+                end
             end
         end
     end
     return false
 end
+
 
 
 local function loadMainHub()
@@ -193,7 +212,8 @@ CheckBtn.MouseButton1Click:Connect(function()
         sg:Destroy()
         loadMainHub()
     else
-        Status.Text = "Key invalida ou expirada! Tente novamente."
+                Status.Text = "Erro: " .. lastServerMsg
+
         Status.TextColor3 = Color3.fromRGB(235, 75, 75)
     end
 end)
