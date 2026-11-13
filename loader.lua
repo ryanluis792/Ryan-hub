@@ -1,7 +1,6 @@
--- [[ INFINITY EVO HUB - PANDA AUTH KEY SYSTEM (ANTI-STRIP URL FIX) ]] --
+-- [[ INFINITY EVO HUB - PANDA AUTH OFFICIAL LIBRARY (PELINDA V3 EXTERNAL) ]] --
 
 local Players = game:GetService("Players")
-local HttpService = game:GetService("HttpService")
 local CoreGui = game:GetService("CoreGui")
 
 local lp = Players.LocalPlayer
@@ -10,103 +9,49 @@ local TargetGui = (gethui and gethui())
     or lp:WaitForChild("PlayerGui")
 
 local SERVICE_ID = "infinityevohub"
-local GET_KEY_URL = string.reverse("buhoveytinifni/yekteg/moc.htuadnap.sda//:sptth")
+local SAVE_FILE = "infinity_evo_key.txt"
 
+-- Carrega a biblioteca oficial do Panda Auth
+local libUrl = string.reverse("aul.lanretxe-3v-adnap/lanretxe/bil/moc.htuadnap.ipa//:sptth")
+local okLib, Pelinda = pcall(function()
+    return loadstring(game:HttpGet(libUrl))()
+end)
 
-local function getHWID()
-    local ok, id = pcall(function()
-        return game:GetService("RbxAnalyticsService"):GetClientId()
-    end)
-    return (ok and id) or tostring(lp.UserId)
+if not okLib or type(Pelinda) ~= "table" or type(Pelinda.Init) ~= "function" then
+    return warn("[Infinity Evo Hub] Erro ao conectar com a biblioteca do Panda Auth.")
 end
-
-local function httpGetSafe(url)
-    local req = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
-    if req then
-        local ok, res = pcall(function()
-            return req({ Url = url, Method = "GET" })
-        end)
-        if ok and res and res.Body then
-            return res.Body
-        end
-    end
-    local ok2, body = pcall(function()
-        return game:HttpGet(url)
-    end)
-    return ok2 and body or nil
-end
-
-local lastServerMsg = "Sem resposta do servidor"
-
-local function validatePandaKey(userKey)
-    local hwid = getHWID()
-    local endpoints = {
-        { url = string.reverse("etadilav/4vp/moc.htuadnap.ipa//:sptth"), method = "POST" },
-        { url = string.reverse("etadilav/syek/1v/moc.htuadnap.ipa//:sptth"), method = "POST" },
-        { url = string.reverse("etadilav/syek/1v/moc.htuadnap.ipa//:sptth"), method = "GET" },
-        { url = string.reverse("noitadilav_2v/ten.tnempolevedadnap//:sptth"), method = "GET" }
-    }
-
-    local req = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
-
-    for _, ep in ipairs(endpoints) do
-        local body = nil
-        if ep.method == "POST" and req then
-            local payload = HttpService:JSONEncode({
-                service = SERVICE_ID,
-                serviceId = SERVICE_ID,
-                identifier = SERVICE_ID,
-                key = userKey,
-                hwid = hwid
-            })
-            local ok, res = pcall(function()
-                return req({
-                    Url = ep.url,
-                    Method = "POST",
-                    Headers = {
-                        ["Content-Type"] = "application/json",
-                        ["Accept"] = "application/json"
-                    },
-                    Body = payload
-                })
-            end)
-            if ok and res and res.Body then
-                body = res.Body
-            end
-        elseif ep.method == "GET" then
-            local q = ep.url .. "?service=" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid
-            body = httpGetSafe(q)
-        end
-
-        if body and body ~= "" then
-            lastServerMsg = tostring(body):sub(1, 65)
-            local okJson, data = pcall(function()
-                return HttpService:JSONDecode(body)
-            end)
-            if okJson and type(data) == "table" then
-                if data.success == true
-                    or data.authenticated == true
-                    or data.valid == true
-                    or data.V2_Authentication == "success"
-                    or (type(data.data) == "table" and data.data.valid == true)
-                then
-                    return true
-                end
-                if data.message or data.error then
-                    lastServerMsg = tostring(data.message or data.error):sub(1, 65)
-                end
-            end
-        end
-    end
-    return false
-end
-
-
 
 local function loadMainHub()
     local u1 = string.reverse("aul.tpircs/niam/buh-nayR/297siulnayr/")
     local u2 = string.reverse("moc.tnetnocresubuhtig.war//:sptth")
     loadstring(game:HttpGet(u2 .. u1))()
+end
+
+local function checkKeyOfficial(keyStr)
+    local ok, result = pcall(function()
+        return Pelinda.Init({
+            Service = SERVICE_ID,
+            Key = keyStr,
+            SilentMode = true
+        })
+    end)
+    return ok and result == "validated!!"
+end
+
+-- Se o usuario ja salvou uma key valida antes, entra direto sem abrir tela de key
+local hasSaved = false
+pcall(function()
+    if isfile and readfile and isfile(SAVE_FILE) then
+        local savedKey = readfile(SAVE_FILE):gsub("%s+", "")
+        if savedKey ~= "" and checkKeyOfficial(savedKey) then
+            hasSaved = true
+        end
+    end
+end)
+
+if hasSaved then
+    loadMainHub()
+    return
 end
 
 -- Interface Neon de Key
@@ -182,17 +127,19 @@ CheckBtn.TextSize = 12
 Instance.new("UICorner", CheckBtn).CornerRadius = UDim.new(0, 6)
 
 GetKeyBtn.MouseButton1Click:Connect(function()
-    local fullLink = GET_KEY_URL .. "?hwid=" .. getHWID()
+    local okLink, link = pcall(function()
+        return Pelinda.GetKeyLink({ Service = SERVICE_ID })
+    end)
+    local finalLink = (okLink and link) or (string.reverse("buhoveytinifni/yekteg/moc.htuadnap.sda//:sptth"))
     if setclipboard then
-        setclipboard(fullLink)
+        setclipboard(finalLink)
         Status.Text = "Link com HWID copiado! Cole no navegador."
         Status.TextColor3 = Color3.fromRGB(0, 255, 170)
     else
-        KeyBox.Text = fullLink
+        KeyBox.Text = finalLink
         Status.Text = "Copie o link da caixa acima no navegador!"
     end
 end)
-
 
 CheckBtn.MouseButton1Click:Connect(function()
     local inputKey = KeyBox.Text:gsub("%s+", "")
@@ -202,18 +149,22 @@ CheckBtn.MouseButton1Click:Connect(function()
         return
     end
 
-    Status.Text = "Verificando key no servidor..."
+    Status.Text = "Validando key no servidor oficial..."
     Status.TextColor3 = Color3.fromRGB(255, 220, 80)
 
-    if validatePandaKey(inputKey) then
-        Status.Text = "Key valida! Carregando hub..."
+    if checkKeyOfficial(inputKey) then
+        pcall(function()
+            if writefile then
+                writefile(SAVE_FILE, inputKey)
+            end
+        end)
+        Status.Text = "Key valida! Carregando Infinity Evo Hub..."
         Status.TextColor3 = Color3.fromRGB(0, 255, 170)
         task.wait(0.4)
         sg:Destroy()
         loadMainHub()
     else
-                Status.Text = "Erro: " .. lastServerMsg
-
+        Status.Text = "Key invalida, expirada ou de outro aparelho!"
         Status.TextColor3 = Color3.fromRGB(235, 75, 75)
     end
 end)
