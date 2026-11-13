@@ -10,7 +10,8 @@ local TargetGui = (gethui and gethui())
     or lp:WaitForChild("PlayerGui")
 
 local SERVICE_ID = "infinityevohub"
-local GET_KEY_URL = string.reverse("buhoveyfinifni/yekteg/moc.htuadnap.sda//:sptth")
+local GET_KEY_URL = string.reverse("buhoveytinifni/yekteg/moc.htuadnap.sda//:sptth")
+
 
 local function getHWID()
     local ok, id = pcall(function()
