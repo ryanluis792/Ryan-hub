@@ -38,25 +38,51 @@ end
 
 local function validatePandaKey(userKey)
     local hwid = getHWID()
-    local base1 = string.reverse("etadilav/syek/1v/moc.htuadnap.ipa//:sptth")
-    local base2 = string.reverse("noitadilav_2v/ten.tnempolevedadnap//:sptth")
-    local query = "?service=" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid
+    local apiUrl = string.reverse("etadilav/4vp/moc.htuadnap.ipa//:sptth")
+    local payload = HttpService:JSONEncode({
+        service = SERVICE_ID,
+        serviceId = SERVICE_ID,
+        key = userKey,
+        hwid = hwid
+    })
 
-    for _, base in ipairs({base1, base2}) do
-        local body = httpGetSafe(base .. query)
-        if body and body ~= "" then
-            local ok, data = pcall(function()
-                return HttpService:JSONDecode(body)
+    local req = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
+    if req then
+        local ok, res = pcall(function()
+            return req({
+                Url = apiUrl,
+                Method = "POST",
+                Headers = { ["Content-Type"] = "application/json" },
+                Body = payload
+            })
+        end)
+        if ok and res and res.Body then
+            local okJson, data = pcall(function()
+                return HttpService:JSONDecode(res.Body)
             end)
-            if ok and type(data) == "table" then
-                if data.success == true or data.V2_Authentication == "success" or data.authenticated == true then
+            if okJson and type(data) == "table" then
+                if data.success == true or data.authenticated == true or data.valid == true then
                     return true
                 end
             end
         end
     end
+
+    local getUrl = apiUrl .. "?service=" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid
+    local body = httpGetSafe(getUrl)
+    if body and body ~= "" then
+        local okJson, data = pcall(function()
+            return HttpService:JSONDecode(body)
+        end)
+        if okJson and type(data) == "table" then
+            if data.success == true or data.authenticated == true or data.valid == true then
+                return true
+            end
+        end
+    end
     return false
 end
+
 
 local function loadMainHub()
     local u1 = string.reverse("aul.tpircs/niam/buh-nayR/297siulnayr/")
