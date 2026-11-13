@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB - PANDA AUTH KEY SYSTEM (DIRECT HTTP FIX) ]] --
+-- [[ INFINITY EVO HUB - PANDA AUTH KEY SYSTEM (ANTI-STRIP URL FIX) ]] --
 
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
@@ -10,7 +10,7 @@ local TargetGui = (gethui and gethui())
     or lp:WaitForChild("PlayerGui")
 
 local SERVICE_ID = "infinityevohub"
-local GET_KEY_URL = "https://pandauth.com" .. SERVICE_ID
+local GET_KEY_URL = string.reverse("buhoveyfinifni/yekteg/moc.htuadnap.sda//:sptth")
 
 local function getHWID()
     local ok, id = pcall(function()
@@ -37,13 +37,12 @@ end
 
 local function validatePandaKey(userKey)
     local hwid = getHWID()
-    local endpoints = {
-        "https://pandauth.com" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid,
-        "https://pandadevelopment.net" .. userKey .. "&service=" .. SERVICE_ID .. "&hwid=" .. hwid
-    }
+    local base1 = string.reverse("etadilav/syek/1v/moc.htuadnap.ipa//:sptth")
+    local base2 = string.reverse("noitadilav_2v/ten.tnempolevedadnap//:sptth")
+    local query = "?service=" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid
 
-    for _, url in ipairs(endpoints) do
-        local body = httpGetSafe(url)
+    for _, base in ipairs({base1, base2}) do
+        local body = httpGetSafe(base .. query)
         if body and body ~= "" then
             local ok, data = pcall(function()
                 return HttpService:JSONDecode(body)
