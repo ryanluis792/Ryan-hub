@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v92.0 - LAST ISLAND QUEST + FRUIT FARM + BOSS FARM ]] --
+-- [[ INFINITY EVO HUB v92.1 - SEA 3 & UNIVERSAL COMBAT FIX ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,7 +31,7 @@ if not antiWater then
 end
 
 -- ==========================================
--- EQUIPAR APENAS MELEE
+-- EQUIPAR MELEE OU ARMA DISPONÍVEL
 -- ==========================================
 local function equipMelee()
     local char = lp.Character
@@ -39,7 +39,7 @@ local function equipMelee()
     if not char or not backpack then return nil end
 
     local equipped = char:FindFirstChildOfClass("Tool")
-    if equipped and equipped.ToolTip == "Melee" then
+    if equipped and (equipped.ToolTip == "Melee" or equipped.ToolTip == "Sword") then
         return equipped
     end
 
@@ -52,7 +52,18 @@ local function equipMelee()
             end
         end
     end
-    return nil
+
+    for _, tool in pairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool.ToolTip == "Sword" then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum:EquipTool(tool)
+                return tool
+            end
+        end
+    end
+
+    return equipped
 end
 
 -- ==========================================
@@ -98,13 +109,14 @@ local function executeRealAttack(targetModel)
     if not root or not targetRoot then return end
 
     local meleeTool = equipMelee()
-    if not meleeTool then return end
 
     targetRoot.Size = Vector3.new(45, 45, 45)
     targetRoot.CanCollide = false
 
     pcall(function()
-        meleeTool:Activate()
+        if meleeTool then
+            meleeTool:Activate()
+        end
         VirtualUser:CaptureController()
         VirtualUser:Button1Down(Vector2.new(1280, 672))
 
@@ -264,12 +276,11 @@ function Hub:CreateWindow(config)
     end
 
     local smokeTop = createEdgeSmoke(UDim2.new(1, 0, 0, 26), UDim2.new(0, 0, 0, 0), 90)
-    local smokeBot = createEdgeSmoke(UDim2.new(1, 0, 0, 28), UDim2.new(0, 0, 1, -28), 270)
-    local smokeLeft = createEdgeSmoke(UDim2.new(0, 22, 1, 0), UDim2.new(0, 0, 0, 0), 0)
-    local smokeRight = createEdgeSmoke(UDim2.new(0, 22, 1, 0), UDim2.new(1, -22, 0, 0), 180)
-
-    task.spawn(function()
-        local rotAngle = 0
+local smokeBot = createEdgeSmoke(UDim2.new(1, 0, 0, 28), UDim2.new(0, 0, 1, -28), 270)
+local smokeLeft = createEdgeSmoke(UDim2.new(0, 22, 1, 0), UDim2.new(0, 0, 0, 0), 0)
+local smokeRight = createEdgeSmoke(UDim2.new(0, 22, 1, 0), UDim2.new(1, -22, 0, 0), 180)
+task.spawn(function()
+local rotAngle = 0
 while MainFrame and MainFrame.Parent do
 rotAngle = (rotAngle + 3) % 360
 StrokeGrad.Rotation = rotAngle
@@ -557,7 +568,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v92.0" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v92.1" })
 _G.AutoFarmMobs = false
 _G.AutoFarmLevelQuest = false
 _G.AutoFarmNoClickFruit = false
@@ -758,6 +769,7 @@ or _G.ObliterateTarget
 or _G.AutoFarmNoClickFruit
 or _G.AutoFarmLevelQuest
 or _G.AutoFarmBosses
+or _G.AutoFarmMobs
 if needsSim then
 pcall(function()
 if sethiddenproperty then
@@ -1044,27 +1056,43 @@ end)
 task.wait(1.5)
 end
 end
--- 4. AUTO FARM MOBS (ORIGINAL)
+-- 4. AUTO FARM MOBS (QUALQUER SEA / INIMIGO PRÓXIMO)
 if _G.AutoFarmMobs and not _G.AutoRaid and not _G.RaidKillAura and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
 local targetMob = nil
+local shortestDist = 3500
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
-and (obj.Name == "Tide Keeper" or obj.Name == "Water Fighter")
 and obj:FindFirstChild("Humanoid")
-and obj.Humanoid.Health > 0
+and obj:FindFirstChild("HumanoidRootPart")
 then
+local eHum = obj.Humanoid
+local eRoot = obj.HumanoidRootPart
+if eHum.Health > 0
+and obj.Name ~= lp.Name
+and not obj.Name:find("Dealer")
+and not obj.Name:find("Giver")
+and not obj.Name:find("Quest")
+then
+local dist = (root.Position - eRoot.Position).Magnitude
+if dist < shortestDist then
+shortestDist = dist
 targetMob = obj
-break
+end
+end
 end
 end
 if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
-if activeTween then activeTween:Cancel() end
 local enemyRoot = targetMob.HumanoidRootPart
+if (root.Position - enemyRoot.Position).Magnitude > 35 then
+if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
+bypassTweenTo(enemyRoot.CFrame + Vector3.new(0, 16, 0), 250)
+end
+else
+if activeTween then activeTween:Cancel() end
 root.Velocity = Vector3.new(0, 0, 0)
 root.CFrame = CFrame.new(enemyRoot.Position + Vector3.new(0, 14, 0), enemyRoot.Position)
 executeRealAttack(targetMob)
-else
-bypassTweenTo(CFrame.new(-3250, 250, -10500), 240)
+end
 end
 end
 -- 4.2 AUTO FARM LEVEL (SEMPRE ÚLTIMA ILHA DO SEA - MAIOR XP/BELI)
@@ -1157,7 +1185,7 @@ enemyHum:ChangeState(Enum.HumanoidStateType.Dead)
 end
 end
 end
--- 4.8 NOVA FUNÇÃO: AUTO FARM BOSSES (TODOS DO MAPA)
+-- 4.8 AUTO FARM BOSSES (TODOS DO MAPA)
 if _G.AutoFarmBosses and not _G.AutoRaid and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
 local targetBoss = nil
 for _, obj in pairs(enemiesFolder:GetChildren()) do
@@ -1488,6 +1516,7 @@ local sea3List = {
 }
 t1:AddToggle("Auto Farm Mobs (Original)", function(state)
 _G.AutoFarmMobs = state
+if not state and activeTween then activeTween:Cancel() end
 end)
 t1:AddToggle("Auto Farm Level (Ultima Ilha Quest)", function(state)
 _G.AutoFarmLevelQuest = state
@@ -1610,4 +1639,4 @@ tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(state)
 _G.TpSea3 = state
 if not state and activeTween then activeTween:Cancel() end
 end)
-print("Infinity Evo Hub v92.0 carregado com sucesso!")
+print("Infinity Evo Hub v92.1 carregado com sucesso!")
