@@ -1,38 +1,67 @@
--- [[ INFINITY EVO HUB - PANDA AUTH KEY SYSTEM (PUSL-V4) ]] --
+-- [[ INFINITY EVO HUB - PANDA AUTH KEY SYSTEM (DIRECT HTTP FIX) ]] --
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
 
 local lp = Players.LocalPlayer
-local CoreGui = game:GetService("CoreGui")
 local TargetGui = (gethui and gethui())
     or (CoreGui:FindFirstChild("RobloxGui") and CoreGui)
     or lp:WaitForChild("PlayerGui")
 
-local PUSL = loadstring(game:HttpGet("https://pandauth.com"))()
-if not PUSL or type(PUSL.configure) ~= "function" then
-    return warn("[Panda] Falha ao inicializar a biblioteca de Key.")
+local SERVICE_ID = "infinityevohub"
+local GET_KEY_URL = "https://pandauth.com" .. SERVICE_ID
+
+local function getHWID()
+    local ok, id = pcall(function()
+        return game:GetService("RbxAnalyticsService"):GetClientId()
+    end)
+    return (ok and id) or tostring(lp.UserId)
 end
 
-PUSL.configure({
-    serviceId = "infinityevohub",
-})
+local function httpGetSafe(url)
+    local req = request or http_request or (syn and syn.request) or (fluxus and fluxus.request)
+    if req then
+        local ok, res = pcall(function()
+            return req({ Url = url, Method = "GET" })
+        end)
+        if ok and res and res.Body then
+            return res.Body
+        end
+    end
+    local ok2, body = pcall(function()
+        return game:HttpGet(url)
+    end)
+    return ok2 and body or nil
+end
+
+local function validatePandaKey(userKey)
+    local hwid = getHWID()
+    local endpoints = {
+        "https://pandauth.com" .. SERVICE_ID .. "&key=" .. userKey .. "&hwid=" .. hwid,
+        "https://pandadevelopment.net" .. userKey .. "&service=" .. SERVICE_ID .. "&hwid=" .. hwid
+    }
+
+    for _, url in ipairs(endpoints) do
+        local body = httpGetSafe(url)
+        if body and body ~= "" then
+            local ok, data = pcall(function()
+                return HttpService:JSONDecode(body)
+            end)
+            if ok and type(data) == "table" then
+                if data.success == true or data.V2_Authentication == "success" or data.authenticated == true then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
 
 local function loadMainHub()
     local u1 = string.reverse("aul.tpircs/niam/buh-nayR/297siulnayr/")
     local u2 = string.reverse("moc.tnetnocresubuhtig.war//:sptth")
     loadstring(game:HttpGet(u2 .. u1))()
-end
-
--- Se o usuario ja definiu getgenv().Key antes de executar
-local preKey = (getgenv and getgenv().Key) or _G.Key
-if preKey and preKey ~= "" then
-    local res = PUSL.validate(preKey)
-    if res and res.success then
-        loadMainHub()
-        return
-    end
 end
 
 -- Interface Neon de Key
@@ -108,13 +137,12 @@ CheckBtn.TextSize = 12
 Instance.new("UICorner", CheckBtn).CornerRadius = UDim.new(0, 6)
 
 GetKeyBtn.MouseButton1Click:Connect(function()
-    local link = PUSL.getKeyUrl() or "https://pandauth.com"
     if setclipboard then
-        setclipboard(link)
+        setclipboard(GET_KEY_URL)
         Status.Text = "Link copiado! Cole no seu navegador."
         Status.TextColor3 = Color3.fromRGB(0, 255, 170)
     else
-        KeyBox.Text = link
+        KeyBox.Text = GET_KEY_URL
         Status.Text = "Copie o link da caixa acima no navegador!"
     end
 end)
@@ -130,8 +158,7 @@ CheckBtn.MouseButton1Click:Connect(function()
     Status.Text = "Verificando key no servidor..."
     Status.TextColor3 = Color3.fromRGB(255, 220, 80)
 
-    local result = PUSL.validate(inputKey)
-    if result and result.success then
+    if validatePandaKey(inputKey) then
         Status.Text = "Key valida! Carregando hub..."
         Status.TextColor3 = Color3.fromRGB(0, 255, 170)
         task.wait(0.4)
