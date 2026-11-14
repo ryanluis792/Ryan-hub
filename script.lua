@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v92.1 - SEA 3 & UNIVERSAL COMBAT FIX ]] --
+-- [[ INFINITY EVO HUB v92.2 - FULL SEA 2 & ISOLATED LOOP FIX ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -167,12 +167,19 @@ local function bypassTweenTo(targetCFrame, speed)
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
-    speed = speed or 240
+    speed = speed or 250
 
-    if activeTween then activeTween:Cancel() end
+    if activeTween then
+        pcall(function() activeTween:Cancel() end)
+    end
 
     local distance = (root.Position - targetCFrame.Position).Magnitude
-    local duration = distance / speed
+    if distance < 5 then
+        root.CFrame = targetCFrame
+        return
+    end
+
+    local duration = math.max(distance / speed, 0.05)
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
 
     hum.PlatformStand = true
@@ -271,11 +278,10 @@ function Hub:CreateWindow(config)
             NumberSequenceKeypoint.new(0, 0.25),
             NumberSequenceKeypoint.new(0.6, 0.75),
             NumberSequenceKeypoint.new(1, 1)
-        })
-        return smoke
-    end
-
-    local smokeTop = createEdgeSmoke(UDim2.new(1, 0, 0, 26), UDim2.new(0, 0, 0, 0), 90)
+})
+return smoke
+end
+local smokeTop = createEdgeSmoke(UDim2.new(1, 0, 0, 26), UDim2.new(0, 0, 0, 0), 90)
 local smokeBot = createEdgeSmoke(UDim2.new(1, 0, 0, 28), UDim2.new(0, 0, 1, -28), 270)
 local smokeLeft = createEdgeSmoke(UDim2.new(0, 22, 1, 0), UDim2.new(0, 0, 0, 0), 0)
 local smokeRight = createEdgeSmoke(UDim2.new(0, 22, 1, 0), UDim2.new(1, -22, 0, 0), 180)
@@ -568,7 +574,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v92.1" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v92.2" })
 _G.AutoFarmMobs = false
 _G.AutoFarmLevelQuest = false
 _G.AutoFarmNoClickFruit = false
@@ -756,6 +762,7 @@ end
 -- LOOP DE PROTEÇÃO FÍSICA, VELOCIDADE E GELO
 -- ==========================================
 RunService.RenderStepped:Connect(function()
+pcall(function()
 local char = lp.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -771,14 +778,12 @@ or _G.AutoFarmLevelQuest
 or _G.AutoFarmBosses
 or _G.AutoFarmMobs
 if needsSim then
-pcall(function()
 if sethiddenproperty then
 sethiddenproperty(lp, "SimulationRadius", math.huge)
 end
 if setsimulationradius then
 setsimulationradius(math.huge, math.huge)
 end
-end)
 end
 if _G.FreezeWorld or _G.BypassDefense then
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
@@ -900,19 +905,19 @@ else
 antiWater.CanCollide = true
 antiWater.CFrame = CFrame.new(root.Position.X, -5, root.Position.Z)
 if root.Position.Y <= 12 then
-pcall(function()
 local cf = CFrame.new(root.Position.X, -1, root.Position.Z)
 workspace.Terrain:FillBlock(cf, Vector3.new(26, 2, 26), Enum.Material.Ice)
+end
+end
+end
 end)
-end
-end
-end
 end)
 -- ==========================================
 -- LOOP DE ENERGIA INFINITA
 -- ==========================================
 task.spawn(function()
 while task.wait(1) do
+pcall(function()
 if _G.InfEnergy then
 local char = lp.Character
 if char then
@@ -922,11 +927,12 @@ energy.Value = energy.MaxValue
 end
 end
 end
+end)
 end
 end)
 local tp1Toggle, tp2Toggle, tp3Toggle
 -- ==========================================
--- LOOP PRINCIPAL
+-- LOOP PRINCIPAL (PROTEGIDO POR PCALL ISOLADO)
 -- ==========================================
 task.spawn(function()
 while task.wait(0.05) do
@@ -937,6 +943,7 @@ local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 if root then
 -- 1. INSTANT KILL AURA
 if _G.InstantKillAura then
+pcall(function()
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj:FindFirstChild("Humanoid")
@@ -955,9 +962,11 @@ end
 end
 end
 end
+end)
 end
 -- 2. KILL AURA PARA RAID
 if _G.RaidKillAura and not _G.AutoRaid then
+pcall(function()
 local raidMob = getNearestRaidMob(root.Position)
 if raidMob and raidMob:FindFirstChild("HumanoidRootPart") then
 if activeTween then activeTween:Cancel() end
@@ -968,9 +977,11 @@ for i = 1, 3 do
 executeRealAttack(raidMob)
 end
 end
+end)
 end
 -- 2.5 KILL AURA TODAS AS 5 ILHAS DA RAID
 if _G.RaidAllIslandsKillAura then
+pcall(function()
 local hoverCenter = getActiveRaidIslandPos(root.Position)
 if hoverCenter then
 for _, obj in pairs(enemiesFolder:GetChildren()) do
@@ -986,7 +997,6 @@ and not obj.Name:find("Dealer")
 and not obj.Name:find("Giver")
 then
 if (hoverCenter - eRoot.Position).Magnitude < 1200 then
-pcall(function()
 root.Velocity = Vector3.new(0, 0, 0)
 root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
 for i = 1, 3 do
@@ -994,15 +1004,16 @@ executeRealAttack(obj)
 end
 eHum.Health = 0
 eHum:ChangeState(Enum.HumanoidStateType.Dead)
+end
+end
+end
+end
+end
 end)
-end
-end
-end
-end
-end
 end
 -- 3. AUTO RAID COMPLETO
 if _G.AutoRaid then
+pcall(function()
 local hoverActive = _G.RaidAllIslandsKillAura
 and getActiveRaidIslandPos(root.Position) ~= nil
 if not hoverActive then
@@ -1025,9 +1036,11 @@ end
 end
 end
 end
+end)
 end
 -- 3.5 AUTO COMPRAR CHIP DE RAID
 if _G.AutoBuyChip then
+pcall(function()
 local hasChip = false
 for _, item in pairs(lp.Backpack:GetChildren()) do
 if item.Name:lower():find("chip") then
@@ -1044,7 +1057,6 @@ end
 end
 end
 if not hasChip then
-pcall(function()
 local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 local comm = remotes and remotes:FindFirstChild("CommF_")
 if comm then
@@ -1052,14 +1064,15 @@ comm:InvokeServer("RaidsNpc", "Select", _G.SelectedChip)
 task.wait(0.25)
 comm:InvokeServer("RaidsNpc", "Buy")
 end
-end)
 task.wait(1.5)
 end
+end)
 end
 -- 4. AUTO FARM MOBS (QUALQUER SEA / INIMIGO PRÓXIMO)
 if _G.AutoFarmMobs and not _G.AutoRaid and not _G.RaidKillAura and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
+pcall(function()
 local targetMob = nil
-local shortestDist = 3500
+local shortestDist = 5000
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj:FindFirstChild("Humanoid")
@@ -1093,10 +1106,16 @@ root.Velocity = Vector3.new(0, 0, 0)
 root.CFrame = CFrame.new(enemyRoot.Position + Vector3.new(0, 14, 0), enemyRoot.Position)
 executeRealAttack(targetMob)
 end
+elseif game.PlaceId == 4442272183 then
+if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
+bypassTweenTo(CFrame.new(-3250, 250, -10500), 250)
 end
+end
+end)
 end
 -- 4.2 AUTO FARM LEVEL (SEMPRE ÚLTIMA ILHA DO SEA - MAIOR XP/BELI)
 if _G.AutoFarmLevelQuest and not _G.AutoRaid and not _G.RaidKillAura and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
+pcall(function()
 local qName, qIdx, mobName, npcCF, mobSpawnCF = getLastIslandQuestBySea()
 local pGui = lp:FindFirstChild("PlayerGui")
 local mainGui = pGui and pGui:FindFirstChild("Main")
@@ -1105,18 +1124,16 @@ local hasQuest = questGui and questGui.Visible
 if not hasQuest then
 if (root.Position - npcCF.Position).Magnitude > 25 then
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(npcCF, 240)
+bypassTweenTo(npcCF, 250)
 end
 else
 if activeTween then activeTween:Cancel() end
 root.Velocity = Vector3.new(0, 0, 0)
-pcall(function()
 local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 local comm = remotes and remotes:FindFirstChild("CommF_")
 if comm then
 comm:InvokeServer("StartQuest", qName, qIdx)
 end
-end)
 task.wait(0.35)
 end
 else
@@ -1139,15 +1156,17 @@ root.CFrame = CFrame.new(enemyRoot.Position + Vector3.new(0, 14, 0), enemyRoot.P
 executeRealAttack(targetMob)
 else
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(mobSpawnCF, 240)
+bypassTweenTo(mobSpawnCF, 250)
 end
 end
 end
+end)
 end
 -- 4.5 AUTO FARM FRUTA (SEM CLICK E SEM HABILIDADES - CORRIGIDO)
 if _G.AutoFarmNoClickFruit and not _G.AutoRaid and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
+pcall(function()
 local targetMob = nil
-local shortestDist = 1800
+local shortestDist = 2500
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj:FindFirstChild("Humanoid")
@@ -1184,9 +1203,11 @@ enemyHum.Health = 0
 enemyHum:ChangeState(Enum.HumanoidStateType.Dead)
 end
 end
+end)
 end
 -- 4.8 AUTO FARM BOSSES (TODOS DO MAPA)
 if _G.AutoFarmBosses and not _G.AutoRaid and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
+pcall(function()
 local targetBoss = nil
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
@@ -1216,6 +1237,7 @@ root.CFrame = CFrame.new(bRoot.Position + Vector3.new(0, 14, 0), bRoot.Position)
 executeRealAttack(targetBoss)
 end
 end
+end)
 end
 -- 5. AUTO HAKI
 if G.AutoHaki and not char:FindFirstChild("HasBuso") then
@@ -1229,6 +1251,7 @@ end)
 end
 -- 6. PUXAR FRUTAS
 if _G.FruitMagnet then
+pcall(function()
 for _, obj in pairs(workspace:GetChildren()) do
 if obj:IsA("Tool")
 and (obj.Name:find("Fruit") or obj.Name:find("Fruta"))
@@ -1237,8 +1260,10 @@ then
 obj.Handle.CFrame = root.CFrame
 end
 end
+end)
 end
 -- 7. ESP JOGADORES
+pcall(function()
 for _, plr in pairs(Players:GetPlayers()) do
 if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
 local pRoot = plr.Character.HumanoidRootPart
@@ -1268,8 +1293,10 @@ if esp then esp:Destroy() end
 end
 end
 end
+end)
 -- 8. AUTO BAÚS
 if _G.AutoChests and not _G.AutoFarmMobs and not _G.AutoRaid then
+pcall(function()
 local chestModels = workspace:FindFirstChild("ChestModels") or workspace
 for _, v in pairs(chestModels:GetChildren()) do
 if not _G.AutoChests then break end
@@ -1283,9 +1310,11 @@ task.wait(0.15)
 end
 end
 end
+end)
 end
 -- 8.5 OBLITERATE TARGET
 if _G.ObliterateTarget then
+pcall(function()
 local target = getNearestRaidMob(root.Position)
 if target and target:FindFirstChild("Humanoid") and target:FindFirstChild("HumanoidRootPart") then
 for i = 1, 5 do
@@ -1294,9 +1323,11 @@ end
 target.Humanoid.Health = 0
 target.Humanoid:ChangeState(Enum.HumanoidStateType.Dead)
 end
+end)
 end
 -- 8.6 MULTIPLY CURRENCY
 if _G.MultiplyCurrency then
+pcall(function()
 local chestModels = workspace:FindFirstChild("ChestModels") or workspace
 for _, v in pairs(chestModels:GetChildren()) do
 if not _G.MultiplyCurrency then break end
@@ -1309,9 +1340,11 @@ part.CFrame = root.CFrame
 end
 end
 end
+end)
 end
 -- 9. AUTO EVENTO ABÓBORA
 if _G.AutoPumpkinEvent then
+pcall(function()
 local targetPart = nil
 local shortestDist = 4000
 local searchFolders = {
@@ -1356,12 +1389,10 @@ else
 if activeTween then activeTween:Cancel() end
 root.Velocity = Vector3.new(0, 0, 0)
 root.CFrame = targetPart.CFrame
-pcall(function()
 if firetouchinterest then
 firetouchinterest(root, targetPart, 0)
 firetouchinterest(root, targetPart, 1)
 end
-end)
 task.wait(0.2)
 end
 else
@@ -1387,9 +1418,11 @@ end
 end
 end
 end
+end)
 end
 -- 10. AUTO EVENTO CAVEIRA
 if _G.AutoSkullEvent then
+pcall(function()
 for _, obj in pairs(workspace:GetDescendants()) do
 if not _G.AutoSkullEvent then break end
 local n = obj.Name:lower()
@@ -1409,13 +1442,14 @@ task.wait(0.1)
 end
 end
 end
+end)
 end
 -- 11. AUTO ESTILO DE LUTA
 if _G.AutoGetStyle then
+pcall(function()
 local hasStyle = lp.Backpack:FindFirstChild(_G.SelectedStyle)
 or char:FindFirstChild(G.SelectedStyle)
 if not hasStyle then
-pcall(function()
 local remotes = ReplicatedStorage:FindFirstChild("Remotes")
 local comm = remotes and remotes:FindFirstChild("CommF")
 if comm then
@@ -1448,12 +1482,13 @@ comm:InvokeServer("BuySanguineArt", true)
 comm:InvokeServer("BuySanguineArt")
 end
 end
-end)
 task.wait(1.5)
 end
+end)
 end
 -- 12. TELEPORTE ILHAS SEA 1, SEA 2 E SEA 3
 if _G.TpSea1 or _G.TpSea2 or _G.TpSea3 then
+pcall(function()
 local dest = nil
 if _G.TpSea1 then
 dest = Sea1Coords[_G.SelectedSea1]
@@ -1478,6 +1513,7 @@ if _G.TpSea2 and tp2Toggle then tp2Toggle.Set(false) end
 if _G.TpSea3 and tp3Toggle then tp3Toggle.Set(false) end
 end
 end
+end)
 end
 end
 end
@@ -1639,4 +1675,4 @@ tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(state)
 _G.TpSea3 = state
 if not state and activeTween then activeTween:Cancel() end
 end)
-print("Infinity Evo Hub v92.1 carregado com sucesso!")
+print("Infinity Evo Hub v92.2 carregado com sucesso!")
