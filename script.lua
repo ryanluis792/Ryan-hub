@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v98.0 - RAID REWARDS FIX, WATER FIGHTER QUEST LOOP & NEW OP FEATURES ]] --
+-- [[ INFINITY EVO HUB v98.1 - AUTO RAID NEXT ISLAND + AUTO FARM LEVEL ATTACK FIX ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -222,7 +222,7 @@ local function executeRealAttack(targetModel)
 end
 
 -- ==========================================
--- ATAQUE EM ÁREA REAL (PARA AUTO RAID DAR BELI E XP)
+-- ATAQUE EM ÁREA REAL (PARA AUTO RAID E QUEST DAREM BELI E XP)
 -- ==========================================
 local lastRealAreaTime = 0
 local function executeRealAreaRaidAttack(myPos, radius)
@@ -350,14 +350,14 @@ end
 -- MOVIMENTO SUAVE QUADRO A QUADRO
 -- ==========================================
 local function moveSmoothStep(root, targetCFrame, dt, speed)
-speed = speed or 295
+speed = speed or 300
 local currentPos = root.Position
 local targetPos = targetCFrame.Position
 local diff = targetPos - currentPos
 local dist = diff.Magnitude
 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 root.Velocity = Vector3.new(0, 0, 0)
-if dist <= 14 then
+if dist <= 16 then
 root.CFrame = targetCFrame
 return true
 else
@@ -394,7 +394,7 @@ return "FountainQuest", 2, {"Galley Captain", "Capitão da Galera", "Capitao da 
 CFrame.new(5259, 38, 4050), CFrame.new(5441, 42, 4950)
 elseif sea == 2 then
 return "ForgottenQuest", 2, {"Water Fighter", "Lutador de Água", "Lutador de Agua", "Guerreiro"},
-CFrame.new(-3054, 236, -10142), CFrame.new(-3352, 285, -10534)
+CFrame.new(-3054, 236, -10142), CFrame.new(-3260, 298, -10550)
 else
 return "TikiQuest2", 2, {"Isle Champion", "Campeão da ilha", "Campeao da ilha"},
 CFrame.new(-16539, 55, 1051), CFrame.new(-16634, 85, 1106)
@@ -726,7 +726,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v98.0" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v98.1" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -923,7 +923,7 @@ elseif getCurrentSea() == 2 then
 moveSmoothStep(root, CFrame.new(-3250, 250, -10500), dt, 290)
 end
 end
--- 5. AUTO FARM LEVEL (PEGA A QUEST, ATACA OS WATER FIGHTER E REPETE A QUEST AUTOMATICAMENTE)
+-- 5. AUTO FARM LEVEL (PEGA A QUEST, VAI AO SPAWN DOS NPCS, ATACA E REPETE A QUEST)
 if State.AutoFarmLevelQuest then
 local qName, qIdx, mobNames, npcCF, mobSpawnCF = getLastIslandQuestBySea()
 local pGui = lp:FindFirstChild("PlayerGui")
@@ -931,7 +931,7 @@ local mainGui = pGui and pGui:FindFirstChild("Main")
 local questGui = mainGui and mainGui:FindFirstChild("Quest")
 local hasQuest = questGui and questGui.Visible
 if not hasQuest then
-local arrived = moveSmoothStep(root, npcCF, dt, 300)
+local arrived = moveSmoothStep(root, npcCF, dt, 310)
 if arrived then
 pcall(function()
 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qName, qIdx)
@@ -940,7 +940,7 @@ end
 else
 local target = nil
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
-local bestDist = 7000
+local bestDist = 10000
 for idx, obj in ipairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model") and obj.Name ~= lp.Name and not obj.Name:find("Dealer") and not obj.Name:find("Giver") then
 local eHum = obj:FindFirstChildOfClass("Humanoid")
@@ -953,7 +953,7 @@ matched = true
 break
 end
 end
-if matched or (eRoot.Position - mobSpawnCF.Position).Magnitude < 1800 then
+if matched or (eRoot.Position - mobSpawnCF.Position).Magnitude < 2500 then
 local d = (root.Position - eRoot.Position).Magnitude
 if d < bestDist then
 bestDist = d
@@ -965,14 +965,15 @@ end
 end
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
-local dodgeY = State.GodDodge and (11 + math.sin(now * 16) * 4) or 10
+local dodgeY = State.GodDodge and (11 + math.sin(now * 16) * 4) or 9
 local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, dodgeY, 0), eRoot.Position)
-local arrived = moveSmoothStep(root, hoverCF, dt, 300)
-if arrived or (root.Position - eRoot.Position).Magnitude <= 32 then
+local arrived = moveSmoothStep(root, hoverCF, dt, 310)
+if arrived or (root.Position - eRoot.Position).Magnitude <= 35 then
+executeRealAreaRaidAttack(root.Position, 120)
 executeRealAttack(target)
 end
 else
-moveSmoothStep(root, mobSpawnCF, dt, 300)
+moveSmoothStep(root, mobSpawnCF, dt, 310)
 end
 end
 end
@@ -1005,10 +1006,10 @@ executeRealAttack(boss)
 end
 end
 end
--- 8. AUTO RAID (ATAQUE REAL EM ÁREA -> DÁ 100% DO BELI, XP E FRAGMENTOS)
+-- 8. AUTO RAID (ATAQUE REAL EM ÁREA + AVANÇA PARA A PRÓXIMA ILHA AUTOMATICAMENTE)
 if State.AutoRaid then
 executeRealAreaRaidAttack(root.Position, 1600)
-local target = findNearestEnemy(root.Position, 1600, false)
+local target = findNearestEnemy(root.Position, 1800, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
 local dodgeY = State.GodDodge and (12 + math.sin(now * 16) * 4) or 11
@@ -1016,16 +1017,32 @@ root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, dodgeY, 0), eRoot.Position)
 executeRealAttack(target)
 else
+local nextIslandPos = nil
+local map = workspace:FindFirstChild("Map")
+local raidFolder = map and map:FindFirstChild("Raid")
 local wo = workspace:FindFirstChild("_WorldOrigin")
 local locs = wo and wo:FindFirstChild("Locations")
-if locs then
 for i = 5, 1, -1 do
-local isl = locs:FindFirstChild("Island " .. tostring(i))
-if isl and (root.Position - isl.Position).Magnitude < 4500 then
-moveSmoothStep(root, CFrame.new(isl.Position + Vector3.new(0, 22, 0)), dt, 300)
+local islName = "Island " .. tostring(i)
+local foundPos = nil
+if raidFolder and raidFolder:FindFirstChild(islName) then
+local islObj = raidFolder[islName]
+foundPos = islObj:IsA("Model") and islObj:GetPivot().Position
+or (islObj:IsA("BasePart") and islObj.Position)
+end
+if not foundPos and locs and locs:FindFirstChild(islName) then
+foundPos = locs[islName].Position
+end
+if foundPos then
+local distToIsl = (root.Position - foundPos).Magnitude
+if distToIsl > 350 and distToIsl < 15000 then
+nextIslandPos = foundPos
 break
 end
 end
+end
+if nextIslandPos then
+moveSmoothStep(root, CFrame.new(nextIslandPos + Vector3.new(0, 35, 0)), dt, 310)
 end
 end
 end
@@ -1431,4 +1448,4 @@ end
 end)
 end
 end)
-print("Infinity Evo Hub v98.0 carregado com sucesso!")
+print("Infinity Evo Hub v98.1 carregado com sucesso!")
