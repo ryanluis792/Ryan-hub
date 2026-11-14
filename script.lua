@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v95.0 - RAID REWARDS, QUEST ATTACK, FRUIT MASTERY & REMOTE RAID ]] --
+-- [[ INFINITY EVO HUB v96.0 - AURA FIX, COMBAT TAB EXPANSION, MULTI-SKILL FRUIT & SMOOTH JUMP ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -22,6 +22,9 @@ local State = {
     AutoFarmNoClickFruit = false,
     AutoFarmBosses = false,
     InstantKillAura = false,
+    AutoEquipCombat = false,
+    SkillAimbot = false,
+    BigHitbox = false,
     SafeMode = false,
     AutoRaid = false,
     AutoStartRaid = false,
@@ -133,29 +136,44 @@ local function equipFruitTool()
 end
 
 -- ==========================================
--- DISPARAR SKILL DA FRUTA (SEM PRECISAR CLICAR)
+-- DISPARAR QUALQUER SKILL DA FRUTA (Z, X, C, V, F)
 -- ==========================================
 local lastFruitSkill = 0
+local skillIndex = 1
+local fruitKeys = {
+    Enum.KeyCode.Z,
+    Enum.KeyCode.X,
+    Enum.KeyCode.C,
+    Enum.KeyCode.V,
+    Enum.KeyCode.F
+}
+
 local function castFruitSkillAt(targetRoot)
     local fruit = equipFruitTool()
     if not fruit then return end
-    if tick() - lastFruitSkill < 0.35 then return end
+    if tick() - lastFruitSkill < 0.25 then return end
     lastFruitSkill = tick()
 
+    local keyToPress = fruitKeys[skillIndex]
+    skillIndex = skillIndex + 1
+    if skillIndex > #fruitKeys then skillIndex = 1 end
+
     pcall(function()
-        targetRoot.Size = Vector3.new(55, 55, 55)
+        targetRoot.Size = Vector3.new(60, 60, 60)
         targetRoot.CanCollide = false
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Z, false, game)
+        local char = lp.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(root.Position, targetRoot.Position)
+        end
+        VirtualInputManager:SendKeyEvent(true, keyToPress, false, game)
         task.wait(0.05)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Z, false, game)
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
-        task.wait(0.05)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
+        VirtualInputManager:SendKeyEvent(false, keyToPress, false, game)
     end)
 end
 
 -- ==========================================
--- MOTOR DE ATAQUE REAL (REGISTRA BELI E XP)
+-- MOTOR DE ATAQUE REAL E AURA EM ÁREA
 -- ==========================================
 local lastAttackTime = 0
 local function executeRealAttack(targetModel)
@@ -167,11 +185,11 @@ local function executeRealAttack(targetModel)
     local weapon = equipWeapon()
 
     pcall(function()
-        targetRoot.Size = Vector3.new(55, 55, 55)
+        targetRoot.Size = Vector3.new(60, 60, 60)
         targetRoot.CanCollide = false
     end)
 
-    if tick() - lastAttackTime < 0.08 then return end
+    if tick() - lastAttackTime < 0.06 then return end
     lastAttackTime = tick()
 
     pcall(function()
@@ -194,6 +212,67 @@ local function executeRealAttack(targetModel)
             end
         end
     end)
+end
+
+local lastAuraTime = 0
+local function executeAreaAura(myPos, radius)
+    local char = lp.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
+    local hitList = {}
+    local mainTargetRoot = nil
+
+    for idx, obj in ipairs(enemiesFolder:GetChildren()) do
+        if obj:IsA("Model")
+            and obj.Name ~= lp.Name
+            and not obj.Name:find("Dealer")
+            and not obj.Name:find("Giver")
+        then
+            local eHum = obj:FindFirstChildOfClass("Humanoid")
+            local eRoot = obj:FindFirstChild("HumanoidRootPart")
+            if eHum and eRoot and eHum.Health > 0 then
+                if (myPos - eRoot.Position).Magnitude <= radius then
+                    eRoot.Size = Vector3.new(65, 65, 65)
+                    eRoot.CanCollide = false
+                    if not mainTargetRoot then
+                        mainTargetRoot = eRoot
+                    end
+                    table.insert(hitList, {obj, eRoot})
+                end
+            end
+        end
+    end
+
+    if #hitList == 0 or not mainTargetRoot then return false end
+
+    local weapon = equipWeapon()
+    if tick() - lastAuraTime < 0.07 then return true end
+    lastAuraTime = tick()
+
+    pcall(function()
+        if weapon then
+            weapon:Activate()
+        end
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton1(Vector2.new(640, 360))
+    end)
+
+    pcall(function()
+        local modules = ReplicatedStorage:FindFirstChild("Modules")
+        local net = modules and modules:FindFirstChild("Net")
+        if net then
+            local regAttack = net:FindFirstChild("RE/RegisterAttack")
+            local regHit = net:FindFirstChild("RE/RegisterHit")
+            if regAttack and regHit then
+                regAttack:FireServer(0)
+                regHit:FireServer(mainTargetRoot, hitList)
+            end
+        end
+    end)
+
+    return true
 end
 
 -- ==========================================
@@ -224,58 +303,54 @@ end
 -- ÚLTIMA ILHA DE CADA SEA (DETECÇÃO PELO MAPA)
 -- ==========================================
 local function getCurrentSea()
-    local map = workspace:FindFirstChild("Map")
-    local wo = workspace:FindFirstChild("_WorldOrigin")
-    local locs = wo and wo:FindFirstChild("Locations")
-
-    if (map and (map:FindFirstChild("Dressrosa") or map:FindFirstChild("ForgottenIsland") or map:FindFirstChild("GreenBit")))
-        or (locs and (locs:FindFirstChild("Kingdom of Rose") or locs:FindFirstChild("Forgotten Island")))
-        or game.PlaceId == 4442272183
-    then
-        return 2
-    elseif (map and (map:FindFirstChild("Turtle") or map:FindFirstChild("PortTown") or map:FindFirstChild("TikiOutpost")))
-        or (locs and (locs:FindFirstChild("Port Town") or locs:FindFirstChild("Floating Turtle") or locs:FindFirstChild("Tiki Outpost")))
-        or game.PlaceId == 7449423635
-    then
-        return 3
-    end
-    return 1
+local map = workspace:FindFirstChild("Map")
+local wo = workspace:FindFirstChild("_WorldOrigin")
+local locs = wo and wo:FindFirstChild("Locations")
+if (map and (map:FindFirstChild("Dressrosa") or map:FindFirstChild("ForgottenIsland") or map:FindFirstChild("GreenBit")))
+or (locs and (locs:FindFirstChild("Kingdom of Rose") or locs:FindFirstChild("Forgotten Island")))
+or game.PlaceId == 4442272183
+then
+return 2
+elseif (map and (map:FindFirstChild("Turtle") or map:FindFirstChild("PortTown") or map:FindFirstChild("TikiOutpost")))
+or (locs and (locs:FindFirstChild("Port Town") or locs:FindFirstChild("Floating Turtle") or locs:FindFirstChild("Tiki Outpost")))
+or game.PlaceId == 7449423635
+then
+return 3
 end
-
+return 1
+end
 local function getLastIslandQuestBySea()
-    local sea = getCurrentSea()
-    if sea == 1 then
-        return "FountainQuest", 2, {"Galley Captain", "Capitão da Galera", "Capitao da Galera"},
-            CFrame.new(5259, 38, 4050), CFrame.new(5441, 42, 4950)
-    elseif sea == 2 then
-        return "ForgottenQuest", 2, {"Water Fighter", "Lutador de Água", "Lutador de Agua", "Guerreiro"},
-            CFrame.new(-3054, 236, -10142), CFrame.new(-3352, 285, -10534)
-    else
-        return "TikiQuest2", 2, {"Isle Champion", "Campeão da ilha", "Campeao da ilha"},
-            CFrame.new(-16539, 55, 1051), CFrame.new(-16634, 85, 1106)
-    end
+local sea = getCurrentSea()
+if sea == 1 then
+return "FountainQuest", 2, {"Galley Captain", "Capitão da Galera", "Capitao da Galera"},
+CFrame.new(5259, 38, 4050), CFrame.new(5441, 42, 4950)
+elseif sea == 2 then
+return "ForgottenQuest", 2, {"Water Fighter", "Lutador de Água", "Lutador de Agua", "Guerreiro"},
+CFrame.new(-3054, 236, -10142), CFrame.new(-3352, 285, -10534)
+else
+return "TikiQuest2", 2, {"Isle Champion", "Campeão da ilha", "Campeao da ilha"},
+CFrame.new(-16539, 55, 1051), CFrame.new(-16634, 85, 1106)
 end
-
+end
 -- ==========================================
 -- EFEITO VISUAL DE CLIQUE NEON
 -- ==========================================
 local function triggerClickEffect(parentObj, clickColor)
-    pcall(function()
-        local flash = Instance.new("Frame", parentObj)
-        flash.Size = UDim2.new(0, 10, 0, 10)
-        flash.Position = UDim2.new(0.5, -5, 0.5, -5)
-        flash.BackgroundColor3 = clickColor or Color3.fromRGB(0, 255, 220)
-        flash.BackgroundTransparency = 0.35
-        flash.BorderSizePixel = 0
-        flash.ZIndex = parentObj.ZIndex + 5
-        Instance.new("UICorner", flash).CornerRadius = UDim.new(0, 8)
-
-        local tInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-        local tween = TweenService:Create(flash, tInfo, {
-            Size = UDim2.new(1, 0, 1, 0),
-            Position = UDim2.new(0, 0, 0, 0),
-            BackgroundTransparency = 1
-        })
+pcall(function()
+local flash = Instance.new("Frame", parentObj)
+flash.Size = UDim2.new(0, 10, 0, 10)
+flash.Position = UDim2.new(0.5, -5, 0.5, -5)
+flash.BackgroundColor3 = clickColor or Color3.fromRGB(0, 255, 220)
+flash.BackgroundTransparency = 0.35
+flash.BorderSizePixel = 0
+flash.ZIndex = parentObj.ZIndex + 5
+Instance.new("UICorner", flash).CornerRadius = UDim.new(0, 8)
+local tInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tween = TweenService:Create(flash, tInfo, {
+Size = UDim2.new(1, 0, 1, 0),
+Position = UDim2.new(0, 0, 0, 0),
+BackgroundTransparency = 1
+})
 tween:Play()
 tween.Completed:Connect(function()
 flash:Destroy()
@@ -551,7 +626,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v95.0" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v96.0" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -602,19 +677,20 @@ local Sea3Coords = {
 ["Submerged Island"] = CFrame.new(-16269, 25, 1371)
 }
 -- ==========================================
--- PULO INFINITO
+-- PULO INFINITO SUAVE (SEM TRANCO ESTRANHO)
 -- ==========================================
 local lastJump = 0
 UserInputService.JumpRequest:Connect(function()
 if State.InfEnergy then
 local now = tick()
-if now - lastJump >= 0.18 then
+if now - lastJump >= 0.16 then
 lastJump = now
 local char = lp.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
-if root then
-root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
-root.CFrame = root.CFrame + Vector3.new(0, 12, 0)
+local hum = char and char:FindFirstChildOfClass("Humanoid")
+if root and hum then
+hum:ChangeState(Enum.HumanoidStateType.Jumping)
+root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 55, root.AssemblyLinearVelocity.Z)
 end
 end
 end
@@ -724,7 +800,7 @@ elseif getCurrentSea() == 2 then
 moveSmoothStep(root, CFrame.new(-3250, 250, -10500), dt, 290)
 end
 end
--- 5. AUTO FARM LEVEL (PEGA A QUEST E ATACA OS NPCS DA ILHA)
+-- 5. AUTO FARM LEVEL (PEGA A QUEST E ATACA OS NPCS DA QUEST QUE PEGOU)
 if State.AutoFarmLevelQuest then
 local qName, qIdx, mobNames, npcCF, mobSpawnCF = getLastIslandQuestBySea()
 local pGui = lp:FindFirstChild("PlayerGui")
@@ -739,23 +815,35 @@ ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qName, qIdx)
 end)
 end
 else
--- Busca primeiro pelos nomes do mob da quest, ou qualquer mob vivo proximo ao spawn da quest
+-- Lê o texto da missão ativa na tela para identificar o NPC exato
+local activeQuestMob = ""
+pcall(function()
+local titleObj = questGui.Container.QuestTitle.Title
+if titleObj and titleObj.Text then
+activeQuestMob = titleObj.Text:gsub("%d+", ""):gsub("Defeat", ""):gsub("Derrote", ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+end)
 local target = nil
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
-local bestDist = 4500
+local bestDist = 6000
 for idx, obj in ipairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model") and obj.Name ~= lp.Name and not obj.Name:find("Dealer") and not obj.Name:find("Giver") then
 local eHum = obj:FindFirstChildOfClass("Humanoid")
 local eRoot = obj:FindFirstChild("HumanoidRootPart")
 if eHum and eRoot and eHum.Health > 0 then
 local matched = false
+if activeQuestMob ~= "" and obj.Name:lower():find(activeQuestMob:lower(), 1, true) then
+matched = true
+end
+if not matched then
 for j, nameOpt in ipairs(mobNames) do
 if obj.Name:find(nameOpt, 1, true) then
 matched = true
 break
 end
 end
-if matched or (eRoot.Position - mobSpawnCF.Position).Magnitude < 1200 then
+end
+if matched or (eRoot.Position - mobSpawnCF.Position).Magnitude < 1500 then
 local d = (root.Position - eRoot.Position).Magnitude
 if d < bestDist then
 bestDist = d
@@ -777,7 +865,7 @@ moveSmoothStep(root, mobSpawnCF, dt, 295)
 end
 end
 end
--- 6. AUTO FARM FRUTA (SEM CLICK + AUMENTA MAESTRIA DA FRUTA)
+-- 6. AUTO FARM FRUTA (SEM CLICK + USA QUALQUER SKILL Z, X, C, V, F NO GOLPE FINAL)
 if State.AutoFarmNoClickFruit then
 local target = findNearestEnemy(root.Position, 5000, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
@@ -789,7 +877,6 @@ if (arrived or (root.Position - eRoot.Position).Magnitude <= 28) and eHum then
 if eHum.Health > eHum.MaxHealth * 0.35 then
 executeRealAttack(target)
 else
--- Quando o mob esta com pouca vida, finaliza com skill da Fruta para subir a Maestria
 castFruitSkillAt(eRoot)
 end
 end
@@ -807,39 +894,67 @@ executeRealAttack(boss)
 end
 end
 end
--- 8. INSTANT KILL AURA & AUTO RAID (GANHANDO BELI E XP DOS NPCS DA RAID)
-if State.InstantKillAura or State.RaidKillAura or State.RaidAllIslandsKillAura or State.AutoRaid or State.ObliterateTarget then
-local target = findNearestEnemy(root.Position, 900, false)
+-- 8. INSTANT KILL AURA & RAID KILL AURA (LIMPAR ILHA & HITKILL TODAS ILHAS)
+if State.InstantKillAura then
+executeAreaAura(root.Position, 350)
+end
+if State.RaidKillAura then
+local didHit = executeAreaAura(root.Position, 1200)
+if didHit then
+local target = findNearestEnemy(root.Position, 1200, false)
+if target and target:FindFirstChild("HumanoidRootPart") then
+local eRoot = target.HumanoidRootPart
+root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 14, 0), eRoot.Position)
+end
+end
+end
+if State.RaidAllIslandsKillAura or State.AutoRaid then
+local didHit = executeAreaAura(root.Position, 1500)
+local target = findNearestEnemy(root.Position, 1500, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
 local eHum = target:FindFirstChildOfClass("Humanoid")
-if State.RaidKillAura or State.RaidAllIslandsKillAura or State.AutoRaid then
 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 11, 0), eRoot.Position)
-end
--- Executa multiplos ataques reais pelo servidor para garantir Beli, XP e Fragmentos
-for hit = 1, 3 do
-executeRealAttack(target)
-end
-if eHum and State.ObliterateTarget and eHum.Health < eHum.MaxHealth * 0.5 then
+root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
+if State.RaidAllIslandsKillAura and eHum and eHum.Health < eHum.MaxHealth then
 pcall(function() eHum.Health = 0 end)
 end
-elseif State.AutoRaid then
+else
 local wo = workspace:FindFirstChild("_WorldOrigin")
 local locs = wo and wo:FindFirstChild("Locations")
 if locs then
 for i = 5, 1, -1 do
 local isl = locs:FindFirstChild("Island " .. tostring(i))
 if isl and (root.Position - isl.Position).Magnitude < 4500 then
-moveSmoothStep(root, CFrame.new(isl.Position + Vector3.new(0, 22, 0)), dt, 295)
+moveSmoothStep(root, CFrame.new(isl.Position + Vector3.new(0, 22, 0)), dt, 300)
 break
 end
 end
 end
 end
 end
--- 9. BRING MOBS / FREEZE / BYPASS
-if State.BringMobs or State.FreezeWorld or State.BypassDefense then
+if State.ObliterateTarget then
+local target = findNearestEnemy(root.Position, 500, false)
+if target and target:FindFirstChild("HumanoidRootPart") then
+executeRealAttack(target)
+local eHum = target:FindFirstChildOfClass("Humanoid")
+if eHum then pcall(function() eHum.Health = 0 end) end
+end
+end
+-- 8.5 NOVAS FUNÇÕES COMBAT / AURA (AUTO EQUIP, SKILL AIMBOT, BIG HITBOX)
+if State.AutoEquipCombat then
+equipWeapon()
+end
+if State.SkillAimbot then
+local target = findNearestEnemy(root.Position, 600, false)
+if target and target:FindFirstChild("HumanoidRootPart") then
+local eRoot = target.HumanoidRootPart
+root.CFrame = CFrame.new(root.Position, Vector3.new(eRoot.Position.X, root.Position.Y, eRoot.Position.Z))
+end
+end
+-- 9. BRING MOBS / FREEZE / BYPASS / BIG HITBOX
+if State.BringMobs or State.FreezeWorld or State.BypassDefense or State.BigHitbox then
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 local anchorCF = nil
 for idx, obj in ipairs(enemiesFolder:GetChildren()) do
@@ -858,8 +973,9 @@ if State.FreezeWorld then
 eHum.WalkSpeed = 0
 eRoot.Anchored = true
 end
-if State.BypassDefense then
-eRoot.Size = Vector3.new(65, 65, 65)
+if State.BypassDefense or State.BigHitbox then
+eRoot.Size = Vector3.new(75, 75, 75)
+eRoot.CanCollide = false
 end
 end
 end
@@ -931,7 +1047,6 @@ ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Select", State.Select
 ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Buy")
 end)
 end
--- AUTO ENTRAR / INICIAR RAID DE QUALQUER LUGAR DO MAPA (SEM VOAR PARA ILHA)
 if State.AutoStartRaid then
 pcall(function()
 local chipTool = nil
@@ -958,7 +1073,6 @@ end
 if chipTool.Parent == lp.Backpack then
 hum:EquipTool(chipTool)
 end
--- Inicia a Raid remotamente de onde voce estiver
 comm:InvokeServer("RaidsNpc", "Select", State.SelectedChip)
 comm:InvokeServer("RaidsNpc", "Start", State.SelectedChip)
 comm:InvokeServer("RaidsNpc", "Start")
@@ -1046,6 +1160,9 @@ t1:AddToggle("Auto Farm Fruta (Sem Click)", function(v) State.AutoFarmNoClickFru
 t1:AddToggle("Auto Farm Bosses (Todos do Mapa)", function(v) State.AutoFarmBosses = v end)
 t1:AddToggle("Protecao Anti-Queda / Noclip", function(v) State.SafeMode = v end)
 t2:AddToggle("Instant Kill Aura", function(v) State.InstantKillAura = v end)
+t2:AddToggle("Auto Equipar Melhor Arma (Melee/Sword)", function(v) State.AutoEquipCombat = v end)
+t2:AddToggle("Aimbot Skills (Mirar no Alvo)", function(v) State.SkillAimbot = v end)
+t2:AddToggle("Hitbox Gigante (Alcance Maximo)", function(v) State.BigHitbox = v end)
 t3:AddToggle("Auto Entrar/Iniciar Raid (Qualquer Lugar)", function(v) State.AutoStartRaid = v end)
 t3:AddToggle("Auto Raid (Atacar e Avancar)", function(v) State.AutoRaid = v end)
 t3:AddToggle("Kill Aura Raid (Limpar Ilha)", function(v) State.RaidKillAura = v end)
@@ -1089,4 +1206,4 @@ t8:AddSelector("Ilha Sea 2", sea2List, function(v) State.SelectedSea2 = v end)
 tp2Toggle = t8:AddToggle("Teleportar Sea 2", function(v) State.TpSea2 = v end)
 t8:AddSelector("Ilha Sea 3", sea3List, function(v) State.SelectedSea3 = v end)
 tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(v) State.TpSea3 = v end)
-print("Infinity Evo Hub v95.0 carregado com sucesso!")
+print("Infinity Evo Hub v96.0 carregado com sucesso!")
