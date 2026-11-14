@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v94.3 - SYNTAX FIX + REMOTE AUTO START RAID ]] --
+-- [[ INFINITY EVO HUB v94.4 - AUTO FARM QUEST ATTACK + AUTO ENTER RAID FIX ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -100,7 +100,7 @@ local function equipWeapon()
 
     if not equipped then
         local firstTool = backpack:FindFirstChildOfClass("Tool")
-        if firstTool then
+        if firstTool and not firstTool.Name:lower():find("chip") then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum:EquipTool(firstTool) return firstTool end
         end
@@ -225,7 +225,7 @@ local function getLastIslandQuestBySea()
         return "FountainQuest", 2, {"Galley Captain", "Capitão da Galera", "Capitao da Galera"},
             CFrame.new(5259, 38, 4050), CFrame.new(5441, 42, 4950)
     elseif sea == 2 then
-        return "ForgottenQuest", 2, {"Water Fighter", "Lutador de Água", "Lutador de Agua"},
+        return "ForgottenQuest", 2, {"Water Fighter", "Lutador de Água", "Lutador de Agua", "Guerreiro"},
             CFrame.new(-3054, 236, -10142), CFrame.new(-3352, 285, -10534)
     else
         return "TikiQuest2", 2, {"Isle Champion", "Campeão da ilha", "Campeao da ilha"},
@@ -280,7 +280,7 @@ function Hub:CreateWindow(config)
 
     local MainFrame = Instance.new("Frame", sg)
     MainFrame.Size = UDim2.new(0, 580, 0, 400)
-    MainFrame.Position = UDim2.new(0.5, -290, 0.5, -200)
+MainFrame.Position = UDim2.new(0.5, -290, 0.5, -200)
 MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
 MainFrame.ClipsDescendants = true
 MainFrame.Active = true
@@ -531,7 +531,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.3" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.4" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -658,6 +658,7 @@ or State.AutoFarmNoClickFruit
 or State.AutoFarmBosses
 or State.SafeMode
 or State.AutoRaid
+or State.AutoStartRaid
 or State.RaidKillAura
 or State.RaidAllIslandsKillAura
 or State.AutoPumpkinEvent
@@ -718,7 +719,7 @@ and questGui.Container.QuestTitle:FindFirstChild("Title")
 if qTitle and type(qTitle.Text) == "string" then
 local txt = qTitle.Text:lower()
 local validQuest = false
-for _, nameOpt in ipairs(mobNames) do
+for , nameOpt in ipairs(mobNames) do
 if txt:find(nameOpt:lower(), 1, true) then
 validQuest = true
 break
@@ -733,7 +734,7 @@ end
 end
 end
 if not hasQuest then
-local arrived = moveSmoothStep(root, npcCF, dt, 280)
+local arrived = moveSmoothStep(root, npcCF, dt, 290)
 if arrived then
 pcall(function()
 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qName, qIdx)
@@ -742,8 +743,12 @@ end
 else
 local target = nil
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
+local bestDist = 5000
 for _, obj in ipairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model") then
+local eHum = obj:FindFirstChildOfClass("Humanoid")
+local eRoot = obj:FindFirstChild("HumanoidRootPart")
+if eHum and eRoot and eHum.Health > 0 then
 local matched = false
 for _, nameOpt in ipairs(mobNames) do
 if obj.Name:find(nameOpt, 1, true) then
@@ -752,23 +757,24 @@ break
 end
 end
 if matched then
-local eHum = obj:FindFirstChildOfClass("Humanoid")
-if eHum and eHum.Health > 0 then
+local d = (root.Position - eRoot.Position).Magnitude
+if d < bestDist then
+bestDist = d
 target = obj
-break
+end
 end
 end
 end
 end
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
-local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 14, 0), eRoot.Position)
-local arrived = moveSmoothStep(root, hoverCF, dt, 280)
-if arrived or (root.Position - eRoot.Position).Magnitude <= 25 then
+local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
+local arrived = moveSmoothStep(root, hoverCF, dt, 290)
+if arrived or (root.Position - eRoot.Position).Magnitude <= 28 then
 executeRealAttack(target)
 end
 else
-moveSmoothStep(root, mobSpawnCF, dt, 280)
+moveSmoothStep(root, mobSpawnCF, dt, 290)
 end
 end
 end
@@ -924,38 +930,52 @@ ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Select", State.Select
 ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Buy")
 end)
 end
--- NOVA FUNÇÃO: AUTO ENTRAR / INICIAR RAID DE QUALQUER LUGAR
+-- AUTO ENTRAR / INICIAR RAID (VAI ATÉ A CÁPSULA E INICIA AUTOMATICAMENTE)
 if State.AutoStartRaid then
 pcall(function()
-local hasChip = false
+local sea = getCurrentSea()
+local labSpot = (sea == 2 and CFrame.new(-6438, 250, -4501))
+or (sea == 3 and CFrame.new(-5017, 314, -2823))
+or CFrame.new(-6438, 250, -4501)
+local chipTool = nil
 for _, item in ipairs(lp.Backpack:GetChildren()) do
-if item.Name:lower():find("chip") then
-hasChip = true
-hum:EquipTool(item)
+if item:IsA("Tool") and item.Name:lower():find("chip") then
+chipTool = item
 break
 end
 end
-if not hasChip then
+if not chipTool then
 for _, item in ipairs(char:GetChildren()) do
-if item.Name:lower():find("chip") then
-hasChip = true
+if item:IsA("Tool") and item.Name:lower():find("chip") then
+chipTool = item
 break
 end
 end
 end
 local comm = ReplicatedStorage.Remotes.CommF_
-if not hasChip then
+if not chipTool then
 comm:InvokeServer("RaidsNpc", "Select", State.SelectedChip)
 comm:InvokeServer("RaidsNpc", "Buy")
+return
+end
+if chipTool.Parent == lp.Backpack then
+hum:EquipTool(chipTool)
+end
+if (root.Position - labSpot.Position).Magnitude > 25 then
+root.CFrame = labSpot
+task.wait(0.2)
 end
 comm:InvokeServer("RaidsNpc", "Start", State.SelectedChip)
 local map = workspace:FindFirstChild("Map")
-local circle = map and (map:FindFirstChild("CircleIsland") or map:FindFirstChild("Boat Castle"))
-if circle then
-for _, desc in ipairs(circle:GetDescendants()) do
-if desc:IsA("ClickDetector") and desc.Parent and desc.Parent.Name:lower():find("button") then
+local lab = map and (map:FindFirstChild("CircleIsland") or map:FindFirstChild("Boat Castle"))
+if lab then
+for _, desc in ipairs(lab:GetDescendants()) do
+if desc:IsA("ClickDetector") then
+local pName = desc.Parent and desc.Parent.Name:lower() or ""
+if pName:find("button") or pName:find("raid") or pName:find("start") then
 if fireclickdetector then
 fireclickdetector(desc)
+end
 end
 end
 end
@@ -1087,4 +1107,4 @@ t8:AddSelector("Ilha Sea 2", sea2List, function(v) State.SelectedSea2 = v end)
 tp2Toggle = t8:AddToggle("Teleportar Sea 2", function(v) State.TpSea2 = v end)
 t8:AddSelector("Ilha Sea 3", sea3List, function(v) State.SelectedSea3 = v end)
 tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(v) State.TpSea3 = v end)
-print("Infinity Evo Hub v94.3 carregado com sucesso!")
+print("Infinity Evo Hub v94.4 carregado com sucesso!")
