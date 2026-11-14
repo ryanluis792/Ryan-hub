@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v92.2 - FULL SEA 2 & ISOLATED LOOP FIX ]] --
+-- [[ INFINITY EVO HUB v93.0 - POST-UPDATE ROBLOX FIX ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 
 local lp = Players.LocalPlayer
@@ -100,8 +101,20 @@ local function equipFruitTool()
 end
 
 -- ==========================================
--- MOTOR DE ATAQUE REAL
+-- MOTOR DE ATAQUE REAL (COMPATÍVEL NOVO PATCH)
 -- ==========================================
+local cachedNet = nil
+local function getNetFolder()
+    if cachedNet and cachedNet.Parent then return cachedNet end
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local net = modules and modules:FindFirstChild("Net")
+    if net then
+        cachedNet = net
+        return net
+    end
+    return nil
+end
+
 local function executeRealAttack(targetModel)
     local char = lp.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -110,32 +123,29 @@ local function executeRealAttack(targetModel)
 
     local meleeTool = equipMelee()
 
-    targetRoot.Size = Vector3.new(45, 45, 45)
-    targetRoot.CanCollide = false
+    pcall(function()
+        targetRoot.Size = Vector3.new(50, 50, 50)
+        targetRoot.CanCollide = false
+    end)
 
     pcall(function()
         if meleeTool then
             meleeTool:Activate()
         end
         VirtualUser:CaptureController()
-        VirtualUser:Button1Down(Vector2.new(1280, 672))
+        VirtualUser:Button1Down(Vector2.new(640, 360))
+        VirtualInputManager:SendMouseButtonEvent(640, 360, 0, true, game, 1)
+        VirtualInputManager:SendMouseButtonEvent(640, 360, 0, false, game, 1)
+    end)
 
-        local modules = ReplicatedStorage:FindFirstChild("Modules")
-        local net = modules and modules:FindFirstChild("Net")
+    pcall(function()
+        local net = getNetFolder()
         if net then
             local regAttack = net:FindFirstChild("RE/RegisterAttack")
             local regHit = net:FindFirstChild("RE/RegisterHit")
             if regAttack and regHit then
                 regAttack:FireServer(0.1)
                 regHit:FireServer(targetRoot, {{targetModel, targetRoot}})
-            end
-        end
-
-        local combatScript = lp.PlayerScripts:FindFirstChild("CombatFramework")
-        if combatScript then
-            local cf = require(combatScript)
-            if cf and cf.activeController then
-                cf.activeController:attack()
             end
         end
     end)
@@ -167,15 +177,16 @@ local function bypassTweenTo(targetCFrame, speed)
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not root or not hum then return end
-    speed = speed or 250
+    speed = speed or 260
 
     if activeTween then
         pcall(function() activeTween:Cancel() end)
     end
 
     local distance = (root.Position - targetCFrame.Position).Magnitude
-    if distance < 5 then
+    if distance < 8 then
         root.CFrame = targetCFrame
+        hum.PlatformStand = false
         return
     end
 
@@ -271,13 +282,13 @@ function Hub:CreateWindow(config)
         grad.Rotation = rot
         grad.Color = ColorSequence.new({
             ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 220)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(90, 50, 220)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 10, 16))
-        })
-        grad.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.25),
-            NumberSequenceKeypoint.new(0.6, 0.75),
-            NumberSequenceKeypoint.new(1, 1)
+ColorSequenceKeypoint.new(0.5, Color3.fromRGB(90, 50, 220)),
+ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 10, 16))
+})
+grad.Transparency = NumberSequence.new({
+NumberSequenceKeypoint.new(0, 0.25),
+NumberSequenceKeypoint.new(0.6, 0.75),
+NumberSequenceKeypoint.new(1, 1)
 })
 return smoke
 end
@@ -574,7 +585,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v92.2" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v93.0" })
 _G.AutoFarmMobs = false
 _G.AutoFarmLevelQuest = false
 _G.AutoFarmNoClickFruit = false
@@ -735,7 +746,7 @@ end
 local function getNearestRaidMob(myPos)
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 local nearest = nil
-local shortestDist = 600
+local shortestDist = 800
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj:FindFirstChild("Humanoid")
@@ -767,24 +778,6 @@ local char = lp.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
 local hum = char and char:FindFirstChildOfClass("Humanoid")
 if root and hum and hum.Health > 0 then
-local needsSim = _G.InstantKillAura
-or _G.RaidKillAura
-or _G.AutoRaid
-or _G.BringMobs
-or _G.RaidAllIslandsKillAura
-or _G.ObliterateTarget
-or _G.AutoFarmNoClickFruit
-or _G.AutoFarmLevelQuest
-or _G.AutoFarmBosses
-or _G.AutoFarmMobs
-if needsSim then
-if sethiddenproperty then
-sethiddenproperty(lp, "SimulationRadius", math.huge)
-end
-if setsimulationradius then
-setsimulationradius(math.huge, math.huge)
-end
-end
 if _G.FreezeWorld or _G.BypassDefense then
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 for _, obj in pairs(enemiesFolder:GetChildren()) do
@@ -867,7 +860,7 @@ and not obj.Name:find("Dealer")
 and not obj.Name:find("Giver")
 then
 local eRoot = obj.HumanoidRootPart
-if (root.Position - eRoot.Position).Magnitude < 300 then
+if (root.Position - eRoot.Position).Magnitude < 350 then
 if not anchorCFrame then
 anchorCFrame = eRoot.CFrame
 else
@@ -953,7 +946,7 @@ local eHum = obj.Humanoid
 local eRoot = obj.HumanoidRootPart
 if eHum.Health > 0
 and obj.Name ~= lp.Name
-and (root.Position - eRoot.Position).Magnitude < 150
+and (root.Position - eRoot.Position).Magnitude < 180
 then
 executeRealAttack(eRoot.Parent)
 if eHum.Health < eHum.MaxHealth then
@@ -1031,7 +1024,7 @@ local nextIsland = getNextRaidIsland(root.Position)
 if nextIsland then
 local targetSpot = CFrame.new(nextIsland.Position + Vector3.new(0, 22, 0))
 if (root.Position - targetSpot.Position).Magnitude > 20 then
-bypassTweenTo(targetSpot, 250)
+bypassTweenTo(targetSpot, 260)
 end
 end
 end
@@ -1072,7 +1065,7 @@ end
 if _G.AutoFarmMobs and not _G.AutoRaid and not _G.RaidKillAura and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
 pcall(function()
 local targetMob = nil
-local shortestDist = 5000
+local shortestDist = 8000
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj:FindFirstChild("Humanoid")
@@ -1084,7 +1077,6 @@ if eHum.Health > 0
 and obj.Name ~= lp.Name
 and not obj.Name:find("Dealer")
 and not obj.Name:find("Giver")
-and not obj.Name:find("Quest")
 then
 local dist = (root.Position - eRoot.Position).Magnitude
 if dist < shortestDist then
@@ -1098,7 +1090,7 @@ if targetMob and targetMob:FindFirstChild("HumanoidRootPart") then
 local enemyRoot = targetMob.HumanoidRootPart
 if (root.Position - enemyRoot.Position).Magnitude > 35 then
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(enemyRoot.CFrame + Vector3.new(0, 16, 0), 250)
+bypassTweenTo(enemyRoot.CFrame + Vector3.new(0, 16, 0), 260)
 end
 else
 if activeTween then activeTween:Cancel() end
@@ -1108,7 +1100,7 @@ executeRealAttack(targetMob)
 end
 elseif game.PlaceId == 4442272183 then
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(CFrame.new(-3250, 250, -10500), 250)
+bypassTweenTo(CFrame.new(-3250, 250, -10500), 260)
 end
 end
 end)
@@ -1124,7 +1116,7 @@ local hasQuest = questGui and questGui.Visible
 if not hasQuest then
 if (root.Position - npcCF.Position).Magnitude > 25 then
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(npcCF, 250)
+bypassTweenTo(npcCF, 260)
 end
 else
 if activeTween then activeTween:Cancel() end
@@ -1156,17 +1148,17 @@ root.CFrame = CFrame.new(enemyRoot.Position + Vector3.new(0, 14, 0), enemyRoot.P
 executeRealAttack(targetMob)
 else
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(mobSpawnCF, 250)
+bypassTweenTo(mobSpawnCF, 260)
 end
 end
 end
 end)
 end
--- 4.5 AUTO FARM FRUTA (SEM CLICK E SEM HABILIDADES - CORRIGIDO)
+-- 4.5 AUTO FARM FRUTA (SEM CLICK E SEM HABILIDADES)
 if _G.AutoFarmNoClickFruit and not _G.AutoRaid and not _G.TpSea1 and not _G.TpSea2 and not _G.TpSea3 then
 pcall(function()
 local targetMob = nil
-local shortestDist = 2500
+local shortestDist = 3500
 for _, obj in pairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj:FindFirstChild("Humanoid")
@@ -1178,7 +1170,6 @@ if eHum.Health > 0
 and obj.Name ~= lp.Name
 and not obj.Name:find("Dealer")
 and not obj.Name:find("Giver")
-and not obj.Name:find("Quest")
 then
 local dist = (root.Position - eRoot.Position).Magnitude
 if dist < shortestDist then
@@ -1189,9 +1180,14 @@ end
 end
 end
 if targetMob and targetMob:FindFirstChild("HumanoidRootPart") and targetMob:FindFirstChild("Humanoid") then
-if activeTween then activeTween:Cancel() end
 local enemyRoot = targetMob.HumanoidRootPart
 local enemyHum = targetMob.Humanoid
+if (root.Position - enemyRoot.Position).Magnitude > 35 then
+if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
+bypassTweenTo(enemyRoot.CFrame + Vector3.new(0, 16, 0), 260)
+end
+else
+if activeTween then activeTween:Cancel() end
 root.Velocity = Vector3.new(0, 0, 0)
 root.CFrame = CFrame.new(enemyRoot.Position + Vector3.new(0, 14, 0), enemyRoot.Position)
 if enemyHum.Health > enemyHum.MaxHealth * 0.85 then
@@ -1201,6 +1197,7 @@ equipFruitTool()
 task.wait(0.08)
 enemyHum.Health = 0
 enemyHum:ChangeState(Enum.HumanoidStateType.Dead)
+end
 end
 end
 end)
@@ -1228,7 +1225,7 @@ if targetBoss and targetBoss:FindFirstChild("HumanoidRootPart") then
 local bRoot = targetBoss.HumanoidRootPart
 if (root.Position - bRoot.Position).Magnitude > 30 then
 if not activeTween or activeTween.PlaybackState ~= Enum.PlaybackState.Playing then
-bypassTweenTo(bRoot.CFrame + Vector3.new(0, 16, 0), 250)
+bypassTweenTo(bRoot.CFrame + Vector3.new(0, 16, 0), 260)
 end
 else
 if activeTween then activeTween:Cancel() end
@@ -1675,4 +1672,4 @@ tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(state)
 _G.TpSea3 = state
 if not state and activeTween then activeTween:Cancel() end
 end)
-print("Infinity Evo Hub v92.2 carregado com sucesso!")
+print("Infinity Evo Hub v93.0 carregado com sucesso!")
