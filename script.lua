@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v94.0 - LOCAL STATE & HEARTBEAT ENGINE FIX ]] --
+-- [[ INFINITY EVO HUB v94.2 - SEA 2 LUTADOR DE AGUA FIX + 2 NEW FEATURES ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,6 +28,9 @@ local State = {
     AutoBuyChip = false,
     SelectedChip = "Flame",
     AutoHaki = false,
+    AutoKenHaki = false,
+    AutoStats = false,
+    SelectedStat = "Melee",
     FruitMagnet = false,
     PlayerESP = false,
     SuperSpeed = false,
@@ -194,18 +197,37 @@ local function moveSmoothStep(root, targetCFrame, dt, speed)
 end
 
 -- ==========================================
--- ÚLTIMA ILHA DE CADA SEA (MAIOR XP E BELI)
+-- ÚLTIMA ILHA DE CADA SEA (DETECÇÃO PELO MAPA)
 -- ==========================================
+local function getCurrentSea()
+    local map = workspace:FindFirstChild("Map")
+    local wo = workspace:FindFirstChild("_WorldOrigin")
+    local locs = wo and wo:FindFirstChild("Locations")
+
+    if (map and (map:FindFirstChild("Dressrosa") or map:FindFirstChild("ForgottenIsland") or map:FindFirstChild("GreenBit")))
+        or (locs and (locs:FindFirstChild("Kingdom of Rose") or locs:FindFirstChild("Forgotten Island")))
+        or game.PlaceId == 4442272183
+    then
+        return 2
+    elseif (map and (map:FindFirstChild("Turtle") or map:FindFirstChild("PortTown") or map:FindFirstChild("TikiOutpost")))
+        or (locs and (locs:FindFirstChild("Port Town") or locs:FindFirstChild("Floating Turtle") or locs:FindFirstChild("Tiki Outpost")))
+        or game.PlaceId == 7449423635
+    then
+        return 3
+    end
+    return 1
+end
+
 local function getLastIslandQuestBySea()
-    local pid = game.PlaceId
-    if pid == 2753915549 then
-        return "FountainQuest", 2, "Galley Captain",
+    local sea = getCurrentSea()
+    if sea == 1 then
+        return "FountainQuest", 2, {"Galley Captain", "Capitão da Galera", "Capitao da Galera"},
             CFrame.new(5259, 38, 4050), CFrame.new(5441, 42, 4950)
-    elseif pid == 4442272183 then
-        return "ForgottenQuest", 2, "Water Fighter",
+    elseif sea == 2 then
+        return "ForgottenQuest", 2, {"Water Fighter", "Lutador de Água", "Lutador de Agua"},
             CFrame.new(-3054, 236, -10142), CFrame.new(-3352, 285, -10534)
     else
-        return "TikiQuest2", 2, "Isle Champion",
+        return "TikiQuest2", 2, {"Isle Champion", "Campeão da ilha", "Campeao da ilha"},
             CFrame.new(-16539, 55, 1051), CFrame.new(-16634, 85, 1106)
     end
 end
@@ -259,34 +281,30 @@ function Hub:CreateWindow(config)
     MainFrame.Size = UDim2.new(0, 580, 0, 400)
     MainFrame.Position = UDim2.new(0.5, -290, 0.5, -200)
     MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
-    MainFrame.ClipsDescendants = true
-    MainFrame.Active = true
-    Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
-    
-    local Stroke = Instance.new("UIStroke", MainFrame)
-    Stroke.Thickness = 2.8
-    Stroke.Color = Color3.fromRGB(0, 255, 220)
-
-    local TitleBar = Instance.new("Frame", MainFrame)
-    TitleBar.Size = UDim2.new(1, 0, 0, 44)
-    TitleBar.BackgroundColor3 = Color3.fromRGB(14, 16, 26)
-    TitleBar.ZIndex = 2
-    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 12)
-
-    local Title = Instance.new("TextLabel", TitleBar)
-    Title.Size = UDim2.new(1, -160, 1, 0)
-    Title.Position = UDim2.new(0, 15, 0, 0)
-    Title.Text = config.Title
-    Title.TextColor3 = Color3.fromRGB(0, 255, 220)
-    Title.Font = Enum.Font.GothamBold
-    Title.TextSize = 14
-    Title.TextXAlignment = Enum.TextXAlignment.Left
-    Title.BackgroundTransparency = 1
-    Title.ZIndex = 3
-
-    local FpsLabel = Instance.new("TextLabel", TitleBar)
-    FpsLabel.Size = UDim2.new(0, 70, 0, 26)
-    FpsLabel.Position = UDim2.new(1, -118, 0.5, -13)
+MainFrame.ClipsDescendants = true
+MainFrame.Active = true
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Thickness = 2.8
+Stroke.Color = Color3.fromRGB(0, 255, 220)
+local TitleBar = Instance.new("Frame", MainFrame)
+TitleBar.Size = UDim2.new(1, 0, 0, 44)
+TitleBar.BackgroundColor3 = Color3.fromRGB(14, 16, 26)
+TitleBar.ZIndex = 2
+Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 12)
+local Title = Instance.new("TextLabel", TitleBar)
+Title.Size = UDim2.new(1, -160, 1, 0)
+Title.Position = UDim2.new(0, 15, 0, 0)
+Title.Text = config.Title
+Title.TextColor3 = Color3.fromRGB(0, 255, 220)
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.BackgroundTransparency = 1
+Title.ZIndex = 3
+local FpsLabel = Instance.new("TextLabel", TitleBar)
+FpsLabel.Size = UDim2.new(0, 70, 0, 26)
+FpsLabel.Position = UDim2.new(1, -118, 0.5, -13)
 FpsLabel.BackgroundColor3 = Color3.fromRGB(20, 24, 36)
 FpsLabel.Text = "FPS: 60"
 FpsLabel.TextColor3 = Color3.fromRGB(0, 255, 170)
@@ -512,7 +530,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.0" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.2" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -681,17 +699,38 @@ local arrived = moveSmoothStep(root, hoverCF, dt, 280)
 if arrived or (root.Position - eRoot.Position).Magnitude <= 25 then
 executeRealAttack(target)
 end
-elseif game.PlaceId == 4442272183 then
+elseif getCurrentSea() == 2 then
 moveSmoothStep(root, CFrame.new(-3250, 250, -10500), dt, 280)
 end
 end
--- 5. AUTO FARM LEVEL (ÚLTIMA ILHA DO SEA)
+-- 5. AUTO FARM LEVEL (ÚLTIMA ILHA DO SEA - LUTADOR DE ÁGUA NO SEA 2)
 if State.AutoFarmLevelQuest then
-local qName, qIdx, mobName, npcCF, mobSpawnCF = getLastIslandQuestBySea()
+local qName, qIdx, mobNames, npcCF, mobSpawnCF = getLastIslandQuestBySea()
 local pGui = lp:FindFirstChild("PlayerGui")
 local mainGui = pGui and pGui:FindFirstChild("Main")
 local questGui = mainGui and mainGui:FindFirstChild("Quest")
 local hasQuest = questGui and questGui.Visible
+if hasQuest then
+local qTitle = questGui:FindFirstChild("Container")
+and questGui.Container:FindFirstChild("QuestTitle")
+and questGui.Container.QuestTitle:FindFirstChild("Title")
+if qTitle and type(qTitle.Text) == "string" then
+local txt = qTitle.Text:lower()
+local validQuest = false
+for , nameOpt in ipairs(mobNames) do
+if txt:find(nameOpt:lower(), 1, true) then
+validQuest = true
+break
+end
+end
+if not validQuest then
+pcall(function()
+ReplicatedStorage.Remotes.CommF:InvokeServer("AbandonQuest")
+end)
+hasQuest = false
+end
+end
+end
 if not hasQuest then
 local arrived = moveSmoothStep(root, npcCF, dt, 280)
 if arrived then
@@ -703,11 +742,20 @@ else
 local target = nil
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 for _, obj in ipairs(enemiesFolder:GetChildren()) do
-if obj:IsA("Model") and obj.Name:find(mobName) then
+if obj:IsA("Model") then
+local matched = false
+for _, nameOpt in ipairs(mobNames) do
+if obj.Name:find(nameOpt, 1, true) then
+matched = true
+break
+end
+end
+if matched then
 local eHum = obj:FindFirstChildOfClass("Humanoid")
 if eHum and eHum.Health > 0 then
 target = obj
 break
+end
 end
 end
 end
@@ -820,6 +868,24 @@ lastSlowTick = now
 if State.AutoHaki and not char:FindFirstChild("HasBuso") then
 pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") end)
 end
+-- NOVA FUNÇÃO 1: AUTO OBSERVATION HAKI (KEN / INSTINTO)
+if State.AutoKenHaki then
+pcall(function()
+if not char:FindFirstChild("HasKen") then
+ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
+end
+end)
+end
+-- NOVA FUNÇÃO 2: AUTO STATS (UPAR STATUS AUTOMATICAMENTE)
+if State.AutoStats then
+pcall(function()
+local data = lp:FindFirstChild("Data")
+local pts = data and data:FindFirstChild("Points")
+if pts and pts.Value > 0 then
+ReplicatedStorage.Remotes.CommF_:InvokeServer("AddPoint", State.SelectedStat, pts.Value)
+end
+end)
+end
 if State.InfEnergy then
 local energy = char:FindFirstChild("Energy")
 if energy and energy:IsA("NumberValue") then energy.Value = energy.MaxValue end
@@ -906,6 +972,9 @@ local raidChips = {
 "Flame", "Ice", "Quake", "Light", "Dark", "Spider",
 "Rumble", "Magma", "Buddha", "Sand", "Phoenix", "Dough"
 }
+local statOptions = {
+"Melee", "Defense", "Sword", "Gun", "Blox Fruit"
+}
 local fightingStyles = {
 "Dark Step", "Electro", "Water Kung Fu", "Dragon Breath",
 "Superhuman", "Death Step", "Sharkman Karate",
@@ -938,6 +1007,9 @@ t3:AddToggle("Kill Aura Todas Ilhas (HitKill)", function(v) State.RaidAllIslands
 t3:AddSelector("Chip da Raid", raidChips, function(v) State.SelectedChip = v end)
 t3:AddToggle("Auto Comprar Chip da Raid", function(v) State.AutoBuyChip = v end)
 t4:AddToggle("Auto Haki (Armamento)", function(v) State.AutoHaki = v end)
+t4:AddToggle("Auto Instinto (Observation Haki)", function(v) State.AutoKenHaki = v end)
+t4:AddSelector("Atributo Auto Stats", statOptions, function(v) State.SelectedStat = v end)
+t4:AddToggle("Auto Upar Status (Auto Stats)", function(v) State.AutoStats = v end)
 t4:AddToggle("Puxar Frutas (Fruit Magnet)", function(v) State.FruitMagnet = v end)
 t4:AddToggle("ESP Jogadores (Ver no Mapa)", function(v) State.PlayerESP = v end)
 t4:AddToggle("Super Velocidade (WalkSpeed)", function(v) State.SuperSpeed = v end)
@@ -971,4 +1043,4 @@ t8:AddSelector("Ilha Sea 2", sea2List, function(v) State.SelectedSea2 = v end)
 tp2Toggle = t8:AddToggle("Teleportar Sea 2", function(v) State.TpSea2 = v end)
 t8:AddSelector("Ilha Sea 3", sea3List, function(v) State.SelectedSea3 = v end)
 tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(v) State.TpSea3 = v end)
-print("Infinity Evo Hub v94.0 carregado com sucesso!")
+print("Infinity Evo Hub v94.2 carregado com sucesso!")
