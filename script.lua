@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v94.2 - SEA 2 LUTADOR DE AGUA FIX + 2 NEW FEATURES ]] --
+-- [[ INFINITY EVO HUB v94.3 - SYNTAX FIX + REMOTE AUTO START RAID ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -23,6 +23,7 @@ local State = {
     InstantKillAura = false,
     SafeMode = false,
     AutoRaid = false,
+    AutoStartRaid = false,
     RaidKillAura = false,
     RaidAllIslandsKillAura = false,
     AutoBuyChip = false,
@@ -280,7 +281,7 @@ function Hub:CreateWindow(config)
     local MainFrame = Instance.new("Frame", sg)
     MainFrame.Size = UDim2.new(0, 580, 0, 400)
     MainFrame.Position = UDim2.new(0.5, -290, 0.5, -200)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
+MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
 MainFrame.ClipsDescendants = true
 MainFrame.Active = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
@@ -530,7 +531,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.2" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.3" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -838,7 +839,11 @@ local eHum = obj:FindFirstChildOfClass("Humanoid")
 local eRoot = obj:FindFirstChild("HumanoidRootPart")
 if eHum and eRoot and eHum.Health > 0 and (root.Position - eRoot.Position).Magnitude < 350 then
 if State.BringMobs then
-if not anchorCF then anchorCF = eRoot.CFrame else eRoot.CFrame = anchorCF end
+if not anchorCF then
+anchorCF = eRoot.CFrame
+else
+eRoot.CFrame = anchorCF
+end
 end
 if State.FreezeWorld then
 eHum.WalkSpeed = 0
@@ -868,7 +873,7 @@ lastSlowTick = now
 if State.AutoHaki and not char:FindFirstChild("HasBuso") then
 pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") end)
 end
--- NOVA FUNÇÃO 1: AUTO OBSERVATION HAKI (KEN / INSTINTO)
+-- AUTO OBSERVATION HAKI (KEN / INSTINTO)
 if State.AutoKenHaki then
 pcall(function()
 if not char:FindFirstChild("HasKen") then
@@ -876,7 +881,7 @@ ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
 end
 end)
 end
--- NOVA FUNÇÃO 2: AUTO STATS (UPAR STATUS AUTOMATICAMENTE)
+-- AUTO STATS (UPAR STATUS AUTOMATICAMENTE)
 if State.AutoStats then
 pcall(function()
 local data = lp:FindFirstChild("Data")
@@ -917,6 +922,44 @@ if State.AutoBuyChip then
 pcall(function()
 ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Select", State.SelectedChip)
 ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Buy")
+end)
+end
+-- NOVA FUNÇÃO: AUTO ENTRAR / INICIAR RAID DE QUALQUER LUGAR
+if State.AutoStartRaid then
+pcall(function()
+local hasChip = false
+for _, item in ipairs(lp.Backpack:GetChildren()) do
+if item.Name:lower():find("chip") then
+hasChip = true
+hum:EquipTool(item)
+break
+end
+end
+if not hasChip then
+for _, item in ipairs(char:GetChildren()) do
+if item.Name:lower():find("chip") then
+hasChip = true
+break
+end
+end
+end
+local comm = ReplicatedStorage.Remotes.CommF_
+if not hasChip then
+comm:InvokeServer("RaidsNpc", "Select", State.SelectedChip)
+comm:InvokeServer("RaidsNpc", "Buy")
+end
+comm:InvokeServer("RaidsNpc", "Start", State.SelectedChip)
+local map = workspace:FindFirstChild("Map")
+local circle = map and (map:FindFirstChild("CircleIsland") or map:FindFirstChild("Boat Castle"))
+if circle then
+for _, desc in ipairs(circle:GetDescendants()) do
+if desc:IsA("ClickDetector") and desc.Parent and desc.Parent.Name:lower():find("button") then
+if fireclickdetector then
+fireclickdetector(desc)
+end
+end
+end
+end
 end)
 end
 if State.AutoGetStyle then
@@ -1001,6 +1044,7 @@ t1:AddToggle("Auto Farm Fruta (Sem Click)", function(v) State.AutoFarmNoClickFru
 t1:AddToggle("Auto Farm Bosses (Todos do Mapa)", function(v) State.AutoFarmBosses = v end)
 t1:AddToggle("Protecao Anti-Queda / Noclip", function(v) State.SafeMode = v end)
 t2:AddToggle("Instant Kill Aura", function(v) State.InstantKillAura = v end)
+t3:AddToggle("Auto Entrar/Iniciar Raid (Qualquer Lugar)", function(v) State.AutoStartRaid = v end)
 t3:AddToggle("Auto Raid (Atacar e Avancar)", function(v) State.AutoRaid = v end)
 t3:AddToggle("Kill Aura Raid (Limpar Ilha)", function(v) State.RaidKillAura = v end)
 t3:AddToggle("Kill Aura Todas Ilhas (HitKill)", function(v) State.RaidAllIslandsKillAura = v end)
@@ -1043,4 +1087,4 @@ t8:AddSelector("Ilha Sea 2", sea2List, function(v) State.SelectedSea2 = v end)
 tp2Toggle = t8:AddToggle("Teleportar Sea 2", function(v) State.TpSea2 = v end)
 t8:AddSelector("Ilha Sea 3", sea3List, function(v) State.SelectedSea3 = v end)
 tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(v) State.TpSea3 = v end)
-print("Infinity Evo Hub v94.2 carregado com sucesso!")
+print("Infinity Evo Hub v94.3 carregado com sucesso!")
