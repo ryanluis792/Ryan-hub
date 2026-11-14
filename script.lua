@@ -718,7 +718,7 @@ and questGui.Container.QuestTitle:FindFirstChild("Title")
 if qTitle and type(qTitle.Text) == "string" then
 local txt = qTitle.Text:lower()
 local validQuest = false
-for , nameOpt in ipairs(mobNames) do
+for _, nameOpt in ipairs(mobNames) do
 if txt:find(nameOpt:lower(), 1, true) then
 validQuest = true
 break
