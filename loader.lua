@@ -24,8 +24,16 @@ end
 local function loadMainHub()
     local u1 = string.reverse("aul.tpircs/niam/buh-nayR/297siulnayr/")
     local u2 = string.reverse("moc.tnetnocresubuhtig.war//:sptth")
-    loadstring(game:HttpGet(u2 .. u1))()
+    local fullUrl = u2 .. u1 .. "?v=" .. tostring(tick())
+    local code = game:HttpGet(fullUrl)
+    local fn, err = loadstring(code)
+    if fn then
+        fn()
+    else
+        warn("[Infinity Evo Hub] Erro no script.lua: " .. tostring(err))
+    end
 end
+
 
 local function checkKeyOfficial(keyStr)
     local ok, result = pcall(function()
