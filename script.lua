@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v94.4 - AUTO FARM QUEST ATTACK + AUTO ENTER RAID FIX ]] --
+-- [[ INFINITY EVO HUB v95.0 - RAID REWARDS, QUEST ATTACK, FRUIT MASTERY & REMOTE RAID ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,6 +6,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 local Lighting = game:GetService("Lighting")
 
 local lp = Players.LocalPlayer
@@ -14,7 +15,7 @@ local TargetGui = (gethui and gethui())
     or (CoreGui:FindFirstChild("RobloxGui") and CoreGui)
     or lp:WaitForChild("PlayerGui")
 
--- ESTADO INTERNO COMPARTILHADO (SEM DEPENDER DE _G DO EXECUTOR)
+-- ESTADO INTERNO COMPARTILHADO
 local State = {
     AutoFarmMobs = false,
     AutoFarmLevelQuest = false,
@@ -84,14 +85,14 @@ local function equipWeapon()
         return equipped
     end
 
-    for _, tool in ipairs(backpack:GetChildren()) do
+    for idx, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") and tool.ToolTip == "Melee" then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum:EquipTool(tool) return tool end
         end
     end
 
-    for _, tool in ipairs(backpack:GetChildren()) do
+    for idx, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") and tool.ToolTip == "Sword" then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum:EquipTool(tool) return tool end
@@ -110,7 +111,7 @@ local function equipWeapon()
 end
 
 -- ==========================================
--- EQUIPAR BLOX FRUIT
+-- EQUIPAR BLOX FRUIT (PARA GANHAR MAESTRIA)
 -- ==========================================
 local function equipFruitTool()
     local char = lp.Character
@@ -118,12 +119,12 @@ local function equipFruitTool()
     if not char or not backpack then return nil end
 
     local equipped = char:FindFirstChildOfClass("Tool")
-    if equipped and (equipped.ToolTip == "Blox Fruit" or equipped.Name:find("Fruit")) then
+    if equipped and (equipped.ToolTip == "Blox Fruit" or equipped.Name:find("Fruit") or equipped.Name:find("-")) then
         return equipped
     end
 
-    for _, tool in ipairs(backpack:GetChildren()) do
-        if tool:IsA("Tool") and (tool.ToolTip == "Blox Fruit" or tool.Name:find("Fruit")) then
+    for idx, tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and (tool.ToolTip == "Blox Fruit" or tool.Name:find("Fruit") or tool.Name:find("-")) then
             local hum = char:FindFirstChildOfClass("Humanoid")
             if hum then hum:EquipTool(tool) return tool end
         end
@@ -132,7 +133,29 @@ local function equipFruitTool()
 end
 
 -- ==========================================
--- MOTOR DE ATAQUE RÁPIDO (PÓS-ATUALIZAÇÃO)
+-- DISPARAR SKILL DA FRUTA (SEM PRECISAR CLICAR)
+-- ==========================================
+local lastFruitSkill = 0
+local function castFruitSkillAt(targetRoot)
+    local fruit = equipFruitTool()
+    if not fruit then return end
+    if tick() - lastFruitSkill < 0.35 then return end
+    lastFruitSkill = tick()
+
+    pcall(function()
+        targetRoot.Size = Vector3.new(55, 55, 55)
+        targetRoot.CanCollide = false
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Z, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Z, false, game)
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.X, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.X, false, game)
+    end)
+end
+
+-- ==========================================
+-- MOTOR DE ATAQUE REAL (REGISTRA BELI E XP)
 -- ==========================================
 local lastAttackTime = 0
 local function executeRealAttack(targetModel)
@@ -177,7 +200,7 @@ end
 -- MOVIMENTO SUAVE QUADRO A QUADRO (SEM TRAVAR)
 -- ==========================================
 local function moveSmoothStep(root, targetCFrame, dt, speed)
-    speed = speed or 280
+    speed = speed or 290
     local currentPos = root.Position
     local targetPos = targetCFrame.Position
     local diff = targetPos - currentPos
@@ -186,7 +209,7 @@ local function moveSmoothStep(root, targetCFrame, dt, speed)
     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
     root.Velocity = Vector3.new(0, 0, 0)
 
-    if dist <= 12 then
+    if dist <= 14 then
         root.CFrame = targetCFrame
         return true
     else
@@ -253,33 +276,30 @@ local function triggerClickEffect(parentObj, clickColor)
             Position = UDim2.new(0, 0, 0, 0),
             BackgroundTransparency = 1
         })
-        tween:Play()
-        tween.Completed:Connect(function()
-            flash:Destroy()
-        end)
-    end)
+tween:Play()
+tween.Completed:Connect(function()
+flash:Destroy()
+end)
+end)
 end
-
 -- ==========================================
 -- CONSTRUTOR DA INTERFACE
 -- ==========================================
 function Hub:CreateWindow(config)
-    local sg = TargetGui:FindFirstChild("InfinityEvoUI")
-    if sg then sg:Destroy() end
-    sg = Instance.new("ScreenGui", TargetGui)
-    sg.Name = "InfinityEvoUI"
-    sg.ResetOnSpawn = false
-
-    local OuterSmoke = Instance.new("Frame", sg)
-    OuterSmoke.Size = UDim2.new(0, 604, 0, 424)
-    OuterSmoke.Position = UDim2.new(0.5, -302, 0.5, -212)
-    OuterSmoke.BackgroundColor3 = Color3.fromRGB(0, 255, 204)
-    OuterSmoke.BackgroundTransparency = 0.88
-    OuterSmoke.BorderSizePixel = 0
-    Instance.new("UICorner", OuterSmoke).CornerRadius = UDim.new(0, 18)
-
-    local MainFrame = Instance.new("Frame", sg)
-    MainFrame.Size = UDim2.new(0, 580, 0, 400)
+local sg = TargetGui:FindFirstChild("InfinityEvoUI")
+if sg then sg:Destroy() end
+sg = Instance.new("ScreenGui", TargetGui)
+sg.Name = "InfinityEvoUI"
+sg.ResetOnSpawn = false
+local OuterSmoke = Instance.new("Frame", sg)
+OuterSmoke.Size = UDim2.new(0, 604, 0, 424)
+OuterSmoke.Position = UDim2.new(0.5, -302, 0.5, -212)
+OuterSmoke.BackgroundColor3 = Color3.fromRGB(0, 255, 204)
+OuterSmoke.BackgroundTransparency = 0.88
+OuterSmoke.BorderSizePixel = 0
+Instance.new("UICorner", OuterSmoke).CornerRadius = UDim.new(0, 18)
+local MainFrame = Instance.new("Frame", sg)
+MainFrame.Size = UDim2.new(0, 580, 0, 400)
 MainFrame.Position = UDim2.new(0.5, -290, 0.5, -200)
 MainFrame.BackgroundColor3 = Color3.fromRGB(8, 10, 16)
 MainFrame.ClipsDescendants = true
@@ -422,10 +442,10 @@ Page.CanvasSize = UDim2.new(0, 0, 0, PageList.AbsoluteContentSize.Y + 12)
 end)
 TabButton.MouseButton1Click:Connect(function()
 triggerClickEffect(TabButton, Color3.fromRGB(0, 255, 220))
-for _, p in ipairs(PageContainer:GetChildren()) do
+for idx, p in ipairs(PageContainer:GetChildren()) do
 if p:IsA("ScrollingFrame") then p.Visible = false end
 end
-for _, b in ipairs(TabContainer:GetChildren()) do
+for idx, b in ipairs(TabContainer:GetChildren()) do
 if b:IsA("TextButton") then
 b.BackgroundColor3 = Color3.fromRGB(18, 20, 30)
 b.TextColor3 = Color3.fromRGB(170, 180, 195)
@@ -531,7 +551,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v94.4" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v95.0" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -606,7 +626,7 @@ local function findNearestEnemy(myPos, maxRange, bossOnly)
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 local bestEnemy = nil
 local bestDist = maxRange or 8000
-for _, obj in ipairs(enemiesFolder:GetChildren()) do
+for idx, obj in ipairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model")
 and obj.Name ~= lp.Name
 and not obj.Name:find("Dealer")
@@ -658,7 +678,6 @@ or State.AutoFarmNoClickFruit
 or State.AutoFarmBosses
 or State.SafeMode
 or State.AutoRaid
-or State.AutoStartRaid
 or State.RaidKillAura
 or State.RaidAllIslandsKillAura
 or State.AutoPumpkinEvent
@@ -667,7 +686,7 @@ or State.TpSea1
 or State.TpSea2
 or State.TpSea3
 if movingActive then
-for _, part in ipairs(char:GetChildren()) do
+for idx, part in ipairs(char:GetChildren()) do
 if part:IsA("BasePart") then part.CanCollide = false end
 end
 antiWater.CanCollide = true
@@ -696,67 +715,47 @@ if State.AutoFarmMobs then
 local target = findNearestEnemy(root.Position, 9000, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
-local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 14, 0), eRoot.Position)
-local arrived = moveSmoothStep(root, hoverCF, dt, 280)
-if arrived or (root.Position - eRoot.Position).Magnitude <= 25 then
+local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
+local arrived = moveSmoothStep(root, hoverCF, dt, 290)
+if arrived or (root.Position - eRoot.Position).Magnitude <= 28 then
 executeRealAttack(target)
 end
 elseif getCurrentSea() == 2 then
-moveSmoothStep(root, CFrame.new(-3250, 250, -10500), dt, 280)
+moveSmoothStep(root, CFrame.new(-3250, 250, -10500), dt, 290)
 end
 end
--- 5. AUTO FARM LEVEL (ÚLTIMA ILHA DO SEA - LUTADOR DE ÁGUA NO SEA 2)
+-- 5. AUTO FARM LEVEL (PEGA A QUEST E ATACA OS NPCS DA ILHA)
 if State.AutoFarmLevelQuest then
 local qName, qIdx, mobNames, npcCF, mobSpawnCF = getLastIslandQuestBySea()
 local pGui = lp:FindFirstChild("PlayerGui")
 local mainGui = pGui and pGui:FindFirstChild("Main")
 local questGui = mainGui and mainGui:FindFirstChild("Quest")
 local hasQuest = questGui and questGui.Visible
-if hasQuest then
-local qTitle = questGui:FindFirstChild("Container")
-and questGui.Container:FindFirstChild("QuestTitle")
-and questGui.Container.QuestTitle:FindFirstChild("Title")
-if qTitle and type(qTitle.Text) == "string" then
-local txt = qTitle.Text:lower()
-local validQuest = false
-for _, nameOpt in ipairs(mobNames) do
-if txt:find(nameOpt:lower(), 1, true) then
-validQuest = true
-break
-end
-end
-if not validQuest then
-pcall(function()
-ReplicatedStorage.Remotes.CommF:InvokeServer("AbandonQuest")
-end)
-hasQuest = false
-end
-end
-end
 if not hasQuest then
-local arrived = moveSmoothStep(root, npcCF, dt, 290)
+local arrived = moveSmoothStep(root, npcCF, dt, 295)
 if arrived then
 pcall(function()
 ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qName, qIdx)
 end)
 end
 else
+-- Busca primeiro pelos nomes do mob da quest, ou qualquer mob vivo proximo ao spawn da quest
 local target = nil
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
-local bestDist = 5000
-for _, obj in ipairs(enemiesFolder:GetChildren()) do
-if obj:IsA("Model") then
+local bestDist = 4500
+for idx, obj in ipairs(enemiesFolder:GetChildren()) do
+if obj:IsA("Model") and obj.Name ~= lp.Name and not obj.Name:find("Dealer") and not obj.Name:find("Giver") then
 local eHum = obj:FindFirstChildOfClass("Humanoid")
 local eRoot = obj:FindFirstChild("HumanoidRootPart")
 if eHum and eRoot and eHum.Health > 0 then
 local matched = false
-for _, nameOpt in ipairs(mobNames) do
+for j, nameOpt in ipairs(mobNames) do
 if obj.Name:find(nameOpt, 1, true) then
 matched = true
 break
 end
 end
-if matched then
+if matched or (eRoot.Position - mobSpawnCF.Position).Magnitude < 1200 then
 local d = (root.Position - eRoot.Position).Magnitude
 if d < bestDist then
 bestDist = d
@@ -768,30 +767,30 @@ end
 end
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
-local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
-local arrived = moveSmoothStep(root, hoverCF, dt, 290)
-if arrived or (root.Position - eRoot.Position).Magnitude <= 28 then
+local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 10, 0), eRoot.Position)
+local arrived = moveSmoothStep(root, hoverCF, dt, 295)
+if arrived or (root.Position - eRoot.Position).Magnitude <= 30 then
 executeRealAttack(target)
 end
 else
-moveSmoothStep(root, mobSpawnCF, dt, 290)
+moveSmoothStep(root, mobSpawnCF, dt, 295)
 end
 end
 end
--- 6. AUTO FARM FRUTA (SEM CLICK)
+-- 6. AUTO FARM FRUTA (SEM CLICK + AUMENTA MAESTRIA DA FRUTA)
 if State.AutoFarmNoClickFruit then
 local target = findNearestEnemy(root.Position, 5000, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
 local eHum = target:FindFirstChildOfClass("Humanoid")
-local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 14, 0), eRoot.Position)
-local arrived = moveSmoothStep(root, hoverCF, dt, 280)
-if (arrived or (root.Position - eRoot.Position).Magnitude <= 25) and eHum then
-if eHum.Health > eHum.MaxHealth * 0.85 then
+local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 11, 0), eRoot.Position)
+local arrived = moveSmoothStep(root, hoverCF, dt, 290)
+if (arrived or (root.Position - eRoot.Position).Magnitude <= 28) and eHum then
+if eHum.Health > eHum.MaxHealth * 0.35 then
 executeRealAttack(target)
 else
-equipFruitTool()
-eHum.Health = 0
+-- Quando o mob esta com pouca vida, finaliza com skill da Fruta para subir a Maestria
+castFruitSkillAt(eRoot)
 end
 end
 end
@@ -801,24 +800,28 @@ if State.AutoFarmBosses then
 local boss = findNearestEnemy(root.Position, 15000, true)
 if boss and boss:FindFirstChild("HumanoidRootPart") then
 local bRoot = boss.HumanoidRootPart
-local hoverCF = CFrame.new(bRoot.Position + Vector3.new(0, 14, 0), bRoot.Position)
-local arrived = moveSmoothStep(root, hoverCF, dt, 280)
-if arrived or (root.Position - bRoot.Position).Magnitude <= 25 then
+local hoverCF = CFrame.new(bRoot.Position + Vector3.new(0, 12, 0), bRoot.Position)
+local arrived = moveSmoothStep(root, hoverCF, dt, 290)
+if arrived or (root.Position - bRoot.Position).Magnitude <= 28 then
 executeRealAttack(boss)
 end
 end
 end
--- 8. INSTANT KILL AURA & RAID KILL AURA
+-- 8. INSTANT KILL AURA & AUTO RAID (GANHANDO BELI E XP DOS NPCS DA RAID)
 if State.InstantKillAura or State.RaidKillAura or State.RaidAllIslandsKillAura or State.AutoRaid or State.ObliterateTarget then
-local target = findNearestEnemy(root.Position, 600, false)
+local target = findNearestEnemy(root.Position, 900, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
 local eHum = target:FindFirstChildOfClass("Humanoid")
 if State.RaidKillAura or State.RaidAllIslandsKillAura or State.AutoRaid then
-root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 14, 0), eRoot.Position)
+root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 11, 0), eRoot.Position)
 end
+-- Executa multiplos ataques reais pelo servidor para garantir Beli, XP e Fragmentos
+for hit = 1, 3 do
 executeRealAttack(target)
-if eHum and (State.RaidAllIslandsKillAura or State.ObliterateTarget or eHum.Health < eHum.MaxHealth) then
+end
+if eHum and State.ObliterateTarget and eHum.Health < eHum.MaxHealth * 0.5 then
 pcall(function() eHum.Health = 0 end)
 end
 elseif State.AutoRaid then
@@ -827,8 +830,8 @@ local locs = wo and wo:FindFirstChild("Locations")
 if locs then
 for i = 5, 1, -1 do
 local isl = locs:FindFirstChild("Island " .. tostring(i))
-if isl and (root.Position - isl.Position).Magnitude < 3500 then
-moveSmoothStep(root, CFrame.new(isl.Position + Vector3.new(0, 22, 0)), dt, 280)
+if isl and (root.Position - isl.Position).Magnitude < 4500 then
+moveSmoothStep(root, CFrame.new(isl.Position + Vector3.new(0, 22, 0)), dt, 295)
 break
 end
 end
@@ -839,7 +842,7 @@ end
 if State.BringMobs or State.FreezeWorld or State.BypassDefense then
 local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
 local anchorCF = nil
-for _, obj in ipairs(enemiesFolder:GetChildren()) do
+for idx, obj in ipairs(enemiesFolder:GetChildren()) do
 if obj:IsA("Model") and obj.Name ~= lp.Name and not obj.Name:find("Dealer") then
 local eHum = obj:FindFirstChildOfClass("Humanoid")
 local eRoot = obj:FindFirstChild("HumanoidRootPart")
@@ -867,8 +870,8 @@ if State.AutoPumpkinEvent or State.AutoSkullEvent then
 local target = findNearestEnemy(root.Position, 3000, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
-local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 14, 0), eRoot.Position)
-if moveSmoothStep(root, hoverCF, dt, 280) then
+local hoverCF = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
+if moveSmoothStep(root, hoverCF, dt, 290) then
 executeRealAttack(target)
 end
 end
@@ -879,7 +882,6 @@ lastSlowTick = now
 if State.AutoHaki and not char:FindFirstChild("HasBuso") then
 pcall(function() ReplicatedStorage.Remotes.CommF_:InvokeServer("Buso") end)
 end
--- AUTO OBSERVATION HAKI (KEN / INSTINTO)
 if State.AutoKenHaki then
 pcall(function()
 if not char:FindFirstChild("HasKen") then
@@ -887,7 +889,6 @@ ReplicatedStorage.Remotes.CommE:FireServer("Ken", true)
 end
 end)
 end
--- AUTO STATS (UPAR STATUS AUTOMATICAMENTE)
 if State.AutoStats then
 pcall(function()
 local data = lp:FindFirstChild("Data")
@@ -902,7 +903,7 @@ local energy = char:FindFirstChild("Energy")
 if energy and energy:IsA("NumberValue") then energy.Value = energy.MaxValue end
 end
 if State.FruitMagnet then
-for _, obj in ipairs(workspace:GetChildren()) do
+for idx, obj in ipairs(workspace:GetChildren()) do
 if obj:IsA("Tool") and (obj.Name:find("Fruit") or obj.Name:find("Fruta")) and obj:FindFirstChild("Handle") then
 obj.Handle.CFrame = root.CFrame
 end
@@ -910,7 +911,7 @@ end
 end
 if State.AutoChests or State.MultiplyCurrency then
 local chests = workspace:FindFirstChild("ChestModels") or workspace
-for _, v in ipairs(chests:GetChildren()) do
+for idx, v in ipairs(chests:GetChildren()) do
 if v.Name:find("Chest") then
 local part = v:IsA("BasePart") and v or v:FindFirstChildWhichIsA("BasePart")
 if part and part.Transparency < 1 then
@@ -930,22 +931,18 @@ ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Select", State.Select
 ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Buy")
 end)
 end
--- AUTO ENTRAR / INICIAR RAID (VAI ATÉ A CÁPSULA E INICIA AUTOMATICAMENTE)
+-- AUTO ENTRAR / INICIAR RAID DE QUALQUER LUGAR DO MAPA (SEM VOAR PARA ILHA)
 if State.AutoStartRaid then
 pcall(function()
-local sea = getCurrentSea()
-local labSpot = (sea == 2 and CFrame.new(-6438, 250, -4501))
-or (sea == 3 and CFrame.new(-5017, 314, -2823))
-or CFrame.new(-6438, 250, -4501)
 local chipTool = nil
-for _, item in ipairs(lp.Backpack:GetChildren()) do
+for idx, item in ipairs(lp.Backpack:GetChildren()) do
 if item:IsA("Tool") and item.Name:lower():find("chip") then
 chipTool = item
 break
 end
 end
 if not chipTool then
-for _, item in ipairs(char:GetChildren()) do
+for idx, item in ipairs(char:GetChildren()) do
 if item:IsA("Tool") and item.Name:lower():find("chip") then
 chipTool = item
 break
@@ -961,25 +958,10 @@ end
 if chipTool.Parent == lp.Backpack then
 hum:EquipTool(chipTool)
 end
-if (root.Position - labSpot.Position).Magnitude > 25 then
-root.CFrame = labSpot
-task.wait(0.2)
-end
+-- Inicia a Raid remotamente de onde voce estiver
+comm:InvokeServer("RaidsNpc", "Select", State.SelectedChip)
 comm:InvokeServer("RaidsNpc", "Start", State.SelectedChip)
-local map = workspace:FindFirstChild("Map")
-local lab = map and (map:FindFirstChild("CircleIsland") or map:FindFirstChild("Boat Castle"))
-if lab then
-for _, desc in ipairs(lab:GetDescendants()) do
-if desc:IsA("ClickDetector") then
-local pName = desc.Parent and desc.Parent.Name:lower() or ""
-if pName:find("button") or pName:find("raid") or pName:find("start") then
-if fireclickdetector then
-fireclickdetector(desc)
-end
-end
-end
-end
-end
+comm:InvokeServer("RaidsNpc", "Start")
 end)
 end
 if State.AutoGetStyle then
@@ -998,7 +980,7 @@ elseif s == "Godhuman" then comm:InvokeServer("BuyGodhuman")
 elseif s == "Sanguine Art" then comm:InvokeServer("BuySanguineArt") end
 end)
 end
-for _, plr in ipairs(Players:GetPlayers()) do
+for idx, plr in ipairs(Players:GetPlayers()) do
 if plr ~= lp and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
 local pRoot = plr.Character.HumanoidRootPart
 local esp = pRoot:FindFirstChild("InfinityBillboardESP")
@@ -1089,7 +1071,7 @@ t5:AddToggle("FreezeWorld (Congelar NPCs)", function(v)
 State.FreezeWorld = v
 if not v then
 local ef = workspace:FindFirstChild("Enemies") or workspace
-for _, obj in ipairs(ef:GetChildren()) do
+for idx, obj in ipairs(ef:GetChildren()) do
 if obj:FindFirstChild("HumanoidRootPart") then obj.HumanoidRootPart.Anchored = false end
 end
 end
@@ -1107,4 +1089,4 @@ t8:AddSelector("Ilha Sea 2", sea2List, function(v) State.SelectedSea2 = v end)
 tp2Toggle = t8:AddToggle("Teleportar Sea 2", function(v) State.TpSea2 = v end)
 t8:AddSelector("Ilha Sea 3", sea3List, function(v) State.SelectedSea3 = v end)
 tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(v) State.TpSea3 = v end)
-print("Infinity Evo Hub v94.4 carregado com sucesso!")
+print("Infinity Evo Hub v95.0 carregado com sucesso!")
