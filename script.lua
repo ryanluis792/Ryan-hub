@@ -1,4 +1,4 @@
--- [[ INFINITY EVO HUB v96.0 - AURA FIX, COMBAT TAB EXPANSION, MULTI-SKILL FRUIT & SMOOTH JUMP ]] --
+-- [[ INFINITY EVO HUB v97.0 - INSTANT KILL AURA, LAB RAID ENTER, KEY TIMER & AFK MODE ]] --
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local TeleportService = game:GetService("TeleportService")
 local Lighting = game:GetService("Lighting")
 
 local lp = Players.LocalPlayer
@@ -37,6 +38,7 @@ local State = {
     AutoStats = false,
     SelectedStat = "Melee",
     FruitMagnet = false,
+    AutoRandomFruit = false,
     PlayerESP = false,
     SuperSpeed = false,
     FpsBoost = false,
@@ -56,7 +58,9 @@ local State = {
     SelectedSea2 = "Kingdom of Rose",
     TpSea2 = false,
     SelectedSea3 = "Port Town",
-    TpSea3 = false
+    TpSea3 = false,
+    AfkMode = false,
+    AutoRejoin = false
 }
 
 local Hub = {}
@@ -173,7 +177,7 @@ local function castFruitSkillAt(targetRoot)
 end
 
 -- ==========================================
--- MOTOR DE ATAQUE REAL E AURA EM ÁREA
+-- MOTOR DE ATAQUE REAL E ELIMINAÇÃO INSTANTÂNEA
 -- ==========================================
 local lastAttackTime = 0
 local function executeRealAttack(targetModel)
@@ -189,7 +193,7 @@ local function executeRealAttack(targetModel)
         targetRoot.CanCollide = false
     end)
 
-    if tick() - lastAttackTime < 0.06 then return end
+    if tick() - lastAttackTime < 0.05 then return end
     lastAttackTime = tick()
 
     pcall(function()
@@ -214,11 +218,19 @@ local function executeRealAttack(targetModel)
     end)
 end
 
-local lastAuraTime = 0
-local function executeAreaAura(myPos, radius)
+local function executeInstantObliterateAura(myPos, radius)
     local char = lp.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return false end
+
+    pcall(function()
+        if sethiddenproperty then
+            sethiddenproperty(lp, "SimulationRadius", math.huge)
+        end
+        if setsimulationradius then
+            setsimulationradius(math.huge, math.huge)
+        end
+    end)
 
     local enemiesFolder = workspace:FindFirstChild("Enemies") or workspace
     local hitList = {}
@@ -234,12 +246,18 @@ local function executeAreaAura(myPos, radius)
             local eRoot = obj:FindFirstChild("HumanoidRootPart")
             if eHum and eRoot and eHum.Health > 0 then
                 if (myPos - eRoot.Position).Magnitude <= radius then
-                    eRoot.Size = Vector3.new(65, 65, 65)
+                    eRoot.Size = Vector3.new(70, 70, 70)
                     eRoot.CanCollide = false
                     if not mainTargetRoot then
                         mainTargetRoot = eRoot
                     end
                     table.insert(hitList, {obj, eRoot})
+
+                    -- Quebra instantânea de HP
+                    pcall(function()
+                        eHum.Health = 0
+                        eHum:ChangeState(Enum.HumanoidStateType.Dead)
+                    end)
                 end
             end
         end
@@ -248,26 +266,20 @@ local function executeAreaAura(myPos, radius)
     if #hitList == 0 or not mainTargetRoot then return false end
 
     local weapon = equipWeapon()
-    if tick() - lastAuraTime < 0.07 then return true end
-    lastAuraTime = tick()
-
     pcall(function()
         if weapon then
             weapon:Activate()
         end
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton1(Vector2.new(640, 360))
-    end)
-
-    pcall(function()
         local modules = ReplicatedStorage:FindFirstChild("Modules")
         local net = modules and modules:FindFirstChild("Net")
         if net then
             local regAttack = net:FindFirstChild("RE/RegisterAttack")
             local regHit = net:FindFirstChild("RE/RegisterHit")
             if regAttack and regHit then
-                regAttack:FireServer(0)
-                regHit:FireServer(mainTargetRoot, hitList)
+                for burst = 1, 6 do
+                    regAttack:FireServer(0)
+                    regHit:FireServer(mainTargetRoot, hitList)
+                end
             end
         end
     end)
@@ -276,7 +288,7 @@ local function executeAreaAura(myPos, radius)
 end
 
 -- ==========================================
--- MOVIMENTO SUAVE QUADRO A QUADRO (SEM TRAVAR)
+-- MOVIMENTO SUAVE QUADRO A QUADRO
 -- ==========================================
 local function moveSmoothStep(root, targetCFrame, dt, speed)
     speed = speed or 290
@@ -286,19 +298,17 @@ local function moveSmoothStep(root, targetCFrame, dt, speed)
     local dist = diff.Magnitude
 
     root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
-    root.Velocity = Vector3.new(0, 0, 0)
-
-    if dist <= 14 then
-        root.CFrame = targetCFrame
-        return true
-    else
-        local step = math.min(dist, speed * dt)
-        local nextPos = currentPos + (diff.Unit * step)
-        root.CFrame = CFrame.new(nextPos, targetPos)
-        return false
-    end
+root.Velocity = Vector3.new(0, 0, 0)
+if dist <= 14 then
+root.CFrame = targetCFrame
+return true
+else
+local step = math.min(dist, speed * dt)
+local nextPos = currentPos + (diff.Unit * step)
+root.CFrame = CFrame.new(nextPos, targetPos)
+return false
 end
-
+end
 -- ==========================================
 -- ÚLTIMA ILHA DE CADA SEA (DETECÇÃO PELO MAPA)
 -- ==========================================
@@ -537,6 +547,38 @@ Page.Visible = true
 currentTab = true
 end
 local TabAPI = {}
+function TabAPI:AddInfoCard(titleText, valueText)
+local Frame = Instance.new("Frame", Page)
+Frame.Size = UDim2.new(1, 0, 0, 54)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 26, 40)
+Frame.ZIndex = 4
+Instance.new("UICorner", Frame).CornerRadius = UDim.new(0, 6)
+local TopLbl = Instance.new("TextLabel", Frame)
+TopLbl.Size = UDim2.new(1, -24, 0, 22)
+TopLbl.Position = UDim2.new(0, 12, 0, 5)
+TopLbl.Text = titleText
+TopLbl.TextColor3 = Color3.fromRGB(165, 180, 200)
+TopLbl.Font = Enum.Font.Gotham
+TopLbl.TextSize = 11
+TopLbl.TextXAlignment = Enum.TextXAlignment.Left
+TopLbl.BackgroundTransparency = 1
+TopLbl.ZIndex = 5
+local ValLbl = Instance.new("TextLabel", Frame)
+ValLbl.Size = UDim2.new(1, -24, 0, 24)
+ValLbl.Position = UDim2.new(0, 12, 0, 25)
+ValLbl.Text = valueText
+ValLbl.TextColor3 = Color3.fromRGB(0, 255, 180)
+ValLbl.Font = Enum.Font.GothamBold
+ValLbl.TextSize = 13
+ValLbl.TextXAlignment = Enum.TextXAlignment.Left
+ValLbl.BackgroundTransparency = 1
+ValLbl.ZIndex = 5
+return {
+SetText = function(newVal)
+ValLbl.Text = newVal
+end
+}
+end
 function TabAPI:AddToggle(text, callback)
 local Frame = Instance.new("Frame", Page)
 Frame.Size = UDim2.new(1, 0, 0, 46)
@@ -626,7 +668,7 @@ return TabAPI
 end
 return WindowAPI
 end
-local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v96.0" })
+local Window = Hub:CreateWindow({ Title = "INFINITY EVO HUB v97.0" })
 local t1 = Window:AddTab({ Title = "Main / Farm" })
 local t2 = Window:AddTab({ Title = "Combat / Aura" })
 local t3 = Window:AddTab({ Title = "Raid / Dungeon" })
@@ -635,6 +677,7 @@ local t5 = Window:AddTab({ Title = "Apelao / OP" })
 local t6 = Window:AddTab({ Title = "Eventos" })
 local t7 = Window:AddTab({ Title = "Estilos de Luta" })
 local t8 = Window:AddTab({ Title = "Teleporte" })
+local t9 = Window:AddTab({ Title = "Key / Status" })
 -- ==========================================
 -- COORDENADAS DAS ILHAS (SEA 1, 2 E 3)
 -- ==========================================
@@ -677,7 +720,7 @@ local Sea3Coords = {
 ["Submerged Island"] = CFrame.new(-16269, 25, 1371)
 }
 -- ==========================================
--- PULO INFINITO SUAVE (SEM TRANCO ESTRANHO)
+-- PULO INFINITO SUAVE
 -- ==========================================
 local lastJump = 0
 UserInputService.JumpRequest:Connect(function()
@@ -693,6 +736,25 @@ hum:ChangeState(Enum.HumanoidStateType.Jumping)
 root.AssemblyLinearVelocity = Vector3.new(root.AssemblyLinearVelocity.X, 55, root.AssemblyLinearVelocity.Z)
 end
 end
+end
+end)
+-- ==========================================
+-- ANTI-AFK AUTOMÁTICO & AUTO REJOIN
+-- ==========================================
+lp.Idled:Connect(function()
+if State.AfkMode then
+pcall(function()
+VirtualUser:CaptureController()
+VirtualUser:ClickButton2(Vector2.new(0, 0))
+end)
+end
+end)
+game:GetService("CoreGui").DescendantAdded:Connect(function(desc)
+if State.AutoRejoin and desc.Name == "ErrorPrompt" then
+task.wait(2)
+pcall(function()
+TeleportService:Teleport(game.PlaceId, lp)
+end)
 end
 end)
 -- ==========================================
@@ -754,6 +816,7 @@ or State.AutoFarmNoClickFruit
 or State.AutoFarmBosses
 or State.SafeMode
 or State.AutoRaid
+or State.AutoStartRaid
 or State.RaidKillAura
 or State.RaidAllIslandsKillAura
 or State.AutoPumpkinEvent
@@ -761,6 +824,7 @@ or State.AutoSkullEvent
 or State.TpSea1
 or State.TpSea2
 or State.TpSea3
+or State.AfkMode
 if movingActive then
 for idx, part in ipairs(char:GetChildren()) do
 if part:IsA("BasePart") then part.CanCollide = false end
@@ -815,7 +879,6 @@ ReplicatedStorage.Remotes.CommF_:InvokeServer("StartQuest", qName, qIdx)
 end)
 end
 else
--- Lê o texto da missão ativa na tela para identificar o NPC exato
 local activeQuestMob = ""
 pcall(function()
 local titleObj = questGui.Container.QuestTitle.Title
@@ -894,14 +957,14 @@ executeRealAttack(boss)
 end
 end
 end
--- 8. INSTANT KILL AURA & RAID KILL AURA (LIMPAR ILHA & HITKILL TODAS ILHAS)
+-- 8. INSTANT KILL AURA & RAID KILL AURA (ELIMINAÇÃO INSTANTÂNEA APELONA)
 if State.InstantKillAura then
-executeAreaAura(root.Position, 350)
+executeInstantObliterateAura(root.Position, 450)
 end
 if State.RaidKillAura then
-local didHit = executeAreaAura(root.Position, 1200)
+local didHit = executeInstantObliterateAura(root.Position, 1500)
 if didHit then
-local target = findNearestEnemy(root.Position, 1200, false)
+local target = findNearestEnemy(root.Position, 1500, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
@@ -910,16 +973,12 @@ end
 end
 end
 if State.RaidAllIslandsKillAura or State.AutoRaid then
-local didHit = executeAreaAura(root.Position, 1500)
-local target = findNearestEnemy(root.Position, 1500, false)
+executeInstantObliterateAura(root.Position, 2500)
+local target = findNearestEnemy(root.Position, 2500, false)
 if target and target:FindFirstChild("HumanoidRootPart") then
 local eRoot = target.HumanoidRootPart
-local eHum = target:FindFirstChildOfClass("Humanoid")
 root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 root.CFrame = CFrame.new(eRoot.Position + Vector3.new(0, 12, 0), eRoot.Position)
-if State.RaidAllIslandsKillAura and eHum and eHum.Health < eHum.MaxHealth then
-pcall(function() eHum.Health = 0 end)
-end
 else
 local wo = workspace:FindFirstChild("_WorldOrigin")
 local locs = wo and wo:FindFirstChild("Locations")
@@ -935,14 +994,9 @@ end
 end
 end
 if State.ObliterateTarget then
-local target = findNearestEnemy(root.Position, 500, false)
-if target and target:FindFirstChild("HumanoidRootPart") then
-executeRealAttack(target)
-local eHum = target:FindFirstChildOfClass("Humanoid")
-if eHum then pcall(function() eHum.Health = 0 end) end
+executeInstantObliterateAura(root.Position, 600)
 end
-end
--- 8.5 NOVAS FUNÇÕES COMBAT / AURA (AUTO EQUIP, SKILL AIMBOT, BIG HITBOX)
+-- 8.5 NOVAS FUNÇÕES COMBAT / AURA
 if State.AutoEquipCombat then
 equipWeapon()
 end
@@ -1025,6 +1079,11 @@ obj.Handle.CFrame = root.CFrame
 end
 end
 end
+if State.AutoRandomFruit then
+pcall(function()
+ReplicatedStorage.Remotes.CommF_:InvokeServer("Cousin", "Buy")
+end)
+end
 if State.AutoChests or State.MultiplyCurrency then
 local chests = workspace:FindFirstChild("ChestModels") or workspace
 for idx, v in ipairs(chests:GetChildren()) do
@@ -1047,8 +1106,13 @@ ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Select", State.Select
 ReplicatedStorage.Remotes.CommF_:InvokeServer("RaidsNpc", "Buy")
 end)
 end
+-- AUTO ENTRAR / INICIAR RAID (VAI ATÉ A CÁPSULA, EQUIPA CHIP E PRESSIONA O BOTÃO DA RAID)
 if State.AutoStartRaid then
 pcall(function()
+local sea = getCurrentSea()
+local labPos = (sea == 2 and Vector3.new(-6438, 250, -4501))
+or (sea == 3 and Vector3.new(-5017, 314, -2823))
+or Vector3.new(-6438, 250, -4501)
 local chipTool = nil
 for idx, item in ipairs(lp.Backpack:GetChildren()) do
 if item:IsA("Tool") and item.Name:lower():find("chip") then
@@ -1073,9 +1137,26 @@ end
 if chipTool.Parent == lp.Backpack then
 hum:EquipTool(chipTool)
 end
+-- Posiciona o jogador exatamente dentro da capsula de inicio da Raid
+if (root.Position - labPos).Magnitude > 22 then
+root.CFrame = CFrame.new(labPos)
+task.wait(0.25)
+end
 comm:InvokeServer("RaidsNpc", "Select", State.SelectedChip)
 comm:InvokeServer("RaidsNpc", "Start", State.SelectedChip)
 comm:InvokeServer("RaidsNpc", "Start")
+-- Aciona o ClickDetector do botao verde do laboratorio
+local map = workspace:FindFirstChild("Map")
+local lab = map and (map:FindFirstChild("CircleIsland") or map:FindFirstChild("Boat Castle"))
+if lab then
+for idx, desc in ipairs(lab:GetDescendants()) do
+if desc:IsA("ClickDetector") then
+if fireclickdetector then
+fireclickdetector(desc)
+end
+end
+end
+end
 end)
 end
 if State.AutoGetStyle then
@@ -1174,6 +1255,7 @@ t4:AddToggle("Auto Instinto (Observation Haki)", function(v) State.AutoKenHaki =
 t4:AddSelector("Atributo Auto Stats", statOptions, function(v) State.SelectedStat = v end)
 t4:AddToggle("Auto Upar Status (Auto Stats)", function(v) State.AutoStats = v end)
 t4:AddToggle("Puxar Frutas (Fruit Magnet)", function(v) State.FruitMagnet = v end)
+t4:AddToggle("Auto Girar Fruta (Random Fruit)", function(v) State.AutoRandomFruit = v end)
 t4:AddToggle("ESP Jogadores (Ver no Mapa)", function(v) State.PlayerESP = v end)
 t4:AddToggle("Super Velocidade (WalkSpeed)", function(v) State.SuperSpeed = v end)
 t4:AddToggle("Remover Nevoa / FPS Boost", function(v)
@@ -1206,4 +1288,58 @@ t8:AddSelector("Ilha Sea 2", sea2List, function(v) State.SelectedSea2 = v end)
 tp2Toggle = t8:AddToggle("Teleportar Sea 2", function(v) State.TpSea2 = v end)
 t8:AddSelector("Ilha Sea 3", sea3List, function(v) State.SelectedSea3 = v end)
 tp3Toggle = t8:AddToggle("Teleportar Sea 3", function(v) State.TpSea3 = v end)
-print("Infinity Evo Hub v96.0 carregado com sucesso!")
+-- ==========================================
+-- ABA 9: KEY / STATUS & MODO AFK
+-- ==========================================
+local savedKeyStr = "Nao encontrada"
+pcall(function()
+if isfile and readfile and isfile("infinity_evo_key.txt") then
+savedKeyStr = readfile("infinity_evo_key.txt"):gsub("%s+", "")
+end
+end)
+local keyStatusText = "Key Ativa: " .. savedKeyStr
+local keyTimeText = "Tempo Restante: Verificando..."
+pcall(function()
+if savedKeyStr ~= "Nao encontrada" then
+if _G.PandaKeyExpire and type(_G.PandaKeyExpire) == "number" then
+local diff = _G.PandaKeyExpire - os.time()
+if diff > 0 then
+local dias = math.floor(diff / 86400)
+local horas = math.floor((diff % 86400) / 3600)
+keyTimeText = string.format("Faltam %d dias e %d horas para expirar", dias, horas)
+else
+keyTimeText = "Key Expirada"
+end
+else
+keyTimeText = "Status: Ativa (24h Gratuito ou Lifetime VIP)"
+end
+else
+keyTimeText = "Nenhuma key salva localmente"
+end
+end)
+t9:AddInfoCard("Chave Autenticada (Panda Auth)", keyStatusText)
+local timeCard = t9:AddInfoCard("Validade / Tempo Restante da Key", keyTimeText)
+t9:AddToggle("Modo AFK (Anti-Kick + Flutuar Seguro)", function(v)
+State.AfkMode = v
+end)
+t9:AddToggle("Auto Rejoin (Reconectar se Cair)", function(v)
+State.AutoRejoin = v
+end)
+-- Atualiza contador regressivo se houver timestamp
+task.spawn(function()
+while task.wait(60) do
+pcall(function()
+if _G.PandaKeyExpire and type(_G.PandaKeyExpire) == "number" then
+local diff = _G.PandaKeyExpire - os.time()
+if diff > 0 then
+local dias = math.floor(diff / 86400)
+local horas = math.floor((diff % 86400) / 3600)
+timeCard.SetText(string.format("Faltam %d dias e %d horas para expirar", dias, horas))
+else
+timeCard.SetText("Key Expirada - Gere uma nova")
+end
+end
+end)
+end
+end)
+print("Infinity Evo Hub v97.0 carregado com sucesso!")
